@@ -1,43 +1,61 @@
 from actions import apply
+from application import create_app
+
 from bson import json_util, BSON
-from flask import Flask
-from flask import request
-from flask_cors import CORS
-from kafka import KafkaProducer
+from bson.objectid import ObjectId
 from pymongo import MongoClient
 
-app = Flask(__name__)
-app.config["DEBUG"] = True
-CORS(app)
+from flask import Flask, request, Blueprint
+
+from kafka import KafkaProducer
+
+
+app = create_app()
+api = Blueprint("api", __name__)
+app.register_blueprint(api, url_prefix="/api")
+
+producer = KafkaProducer(bootstrap_servers=['192.168.1.55:9092'],
+                         value_serializer=lambda x:
+                         json_util.dumps(x).encode('utf-8'))
 
 mongoClient = MongoClient()
 db = mongoClient.lightdb
 scenes = db.scenes
 
 
-@app.route('/', methods=['GET'])
+@api.route('/scenes', methods=['GET'])
 def home():
     docs = scenes.find()
     return json_util.dumps(docs)
 
 
-@app.route('/scene/create', methods=['POST', 'OPTIONS'])
+@api.route('/scene/create', methods=['POST', 'OPTIONS'])
 def createScene():
-    # import pdb; pdb.set_trace()
-    jsonDoc = request.json.get('scene')
-    print('jsonDoc: %', jsonDoc)
-    bsonDoc = BSON.encode(jsonDoc)
-    print('bsonDoc: %', bsonDoc)
-    newId = scenes.insert_one(bsonDoc).inserted_id
-    return newId
-    # scene_id = scenes.insert_one()
+    if request.method == 'OPTIONS':
+        return "ok"
+
+    jsonDoc = request.get_json()
+    newId = scenes.insert_one(jsonDoc).inserted_id
+    return str(newId)
 
 
-@app.route('/scene/<int:scene_id>')
+@api.route('/scene/<string:scene_id>', methods=['GET'])
 def applyScene(scene_id):
-    toApply = scenes.find_one({"_id": scene_id})
-    toApply = BSON.decode(toApply)
-    apply(toApply)
+    print("Hit function")
+    toApply = scenes.find_one({"_id": ObjectId(scene_id)})
+    producer.send('applyScene', toApply)
+    print("applied")
+    return "applied"
+
+@api.route('/scene/<string:scene_id>', methods=['DELETE', 'OPTIONS'])
+def deleteScene(scene_id):
+    # import pdb; pdb.set_trace()
+    if request.method == 'OPTIONS':
+        return "ok"
+
+    scenes.delete_one({'_id': ObjectId(scene_id)})
+    return "done"
 
 
+app.register_blueprint(api, url_prefix="/api")
 app.run(host='0.0.0.0')
