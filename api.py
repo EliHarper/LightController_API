@@ -1,24 +1,23 @@
-from actions import apply
-from application import create_app
-
 from bson import json_util, BSON
 from bson.objectid import ObjectId
 from pymongo import MongoClient
-
 from flask import Flask, request, Blueprint
-
 from kafka import KafkaProducer
+from decouple import config
+
+from actions import apply
+from application import create_app
 
 
 app = create_app()
 api = Blueprint("api", __name__)
 app.register_blueprint(api, url_prefix="/api")
 
-producer = KafkaProducer(bootstrap_servers=['192.168.1.55:9092'],
+producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
                          value_serializer=lambda x:
                          json_util.dumps(x).encode('utf-8'))
 
-mongoClient = MongoClient()
+mongoClient = MongoClient([config('DB_URL')])
 db = mongoClient.lightdb
 scenes = db.scenes
 

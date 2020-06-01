@@ -7,6 +7,7 @@ import time
 from neopixel import *
 from kafka import KafkaConsumer
 from json import loads
+from decouple import config
 
 # LED strip configuration:
 LED_COUNT      = 300      # Number of LED pixels.
@@ -109,23 +110,10 @@ def makeStrip(brightness):
     return strip
 
 def setup():
-    # Process arguments
-    # """ parser = argparse.ArgumentParser()
-    # parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
-    # args = parser.parse_args() """
-
-    # Create NeoPixel object with appropriate configuration.
-
-    # Intialize the library (must be called once before other functions).
-
-
-    # print ('Press Ctrl-C to quit.')
-    # if not args.clear:
-    #     print('Use "-c" argument to clear LEDs on exit')
 
     consumer = KafkaConsumer(
         'applyScene',
-        bootstrap_servers=['192.168.1.55:9092'],
+        bootstrap_servers=[config('KAFKA_URL')],
         auto_offset_reset='earliest',
         enable_auto_commit=True,
         group_id='pi',
