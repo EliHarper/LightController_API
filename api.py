@@ -27,6 +27,13 @@ def home():
     docs = scenes.find()
     return json_util.dumps(docs)
 
+@api.route('/scene/<string:scene_id>', methods=['GET'])
+def applyScene(scene_id):
+    print("Hit function")
+    toApply = scenes.find_one({"_id": ObjectId(scene_id)})
+    producer.send('applyScene', toApply)
+    print("applied")
+    return "applied"
 
 @api.route('/scene/create', methods=['POST', 'OPTIONS'])
 def createScene():
@@ -37,15 +44,6 @@ def createScene():
     newId = scenes.insert_one(jsonDoc).inserted_id
     return str(newId)
 
-
-@api.route('/scene/<string:scene_id>', methods=['GET'])
-def applyScene(scene_id):
-    print("Hit function")
-    toApply = scenes.find_one({"_id": ObjectId(scene_id)})
-    producer.send('applyScene', toApply)
-    print("applied")
-    return "applied"
-
 @api.route('/scene/<string:scene_id>', methods=['DELETE', 'OPTIONS'])
 def deleteScene(scene_id):
     # import pdb; pdb.set_trace()
@@ -53,6 +51,23 @@ def deleteScene(scene_id):
         return "ok"
 
     scenes.delete_one({'_id': ObjectId(scene_id)})
+    return "done"
+
+@api.route('/scene/edit', methods=['PUT', 'OPTIONS'])
+def updateScene():
+    if request.method == 'OPTIONS':
+        return "ok"
+
+    updated = request.get_json()
+    try:
+        id = updated.pop("_id", None)
+        if id is None:
+            raise Exception("No _id value found in updated object")
+    except Exception as e:
+        print(e.args)
+    query = {'_id': ObjectId(id['$oid'])}
+    newVal = {"$set": updated}
+    scenes.update_one(query, newVal)
     return "done"
 
 
