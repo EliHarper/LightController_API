@@ -2,15 +2,19 @@
 
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
-
-import time
 from neopixel import *
+import argparse
+import time
+import sys
+
+sys.path.insert(0, "/home/pi/.local/lib/python3.7/site-packages")
 from kafka import KafkaConsumer
 from json import loads
 from decouple import config
+from PIL import ImageColor
 
 # LED strip configuration:
-LED_COUNT      = 300      # Number of LED pixels.
+LED_COUNT      = 300     # Number of LED pixels.
 LED_PIN        = 18      # GPIO pin connected to the pixels (18 uses PWM!).
 LED_FREQ_HZ    = 800000  # LED signal frequency in hertz (usually 800khz)
 LED_DMA        = 10      # DMA channel to use for generating signal (try 10)
@@ -77,7 +81,7 @@ def theaterChaseRainbow(strip, wait_ms=50):
             for i in range(0, strip.numPixels(), 3):
                 strip.setPixelColor(i+q, 0)
 
-# Personal Additions:
+# Personal Additions: #
 
 class Delta:
     def __init__(self, range, rate, increase=True):
@@ -86,52 +90,80 @@ class Delta:
         self.increase = increase
 
 
-def toRgb(hex):
-    hex = hex.lstrip('#')
-    hlen = len(hex)
-    return tuple(int(hex[i:i + hlen / 3], 16) for i in range(0, hlen, hlen / 3))
+# def toRgb(hex):
+#     hex = hex.lstrip('#')
+#     return tuple(int(hex[i:i + 2], 16) for i in (0, 2, 4))
 
 
 def solidColorFromHex(strip, color, wait_ms=10):
-    # Accept color as hex, brightness as 0-255 value
-    print('Setting solid color to: %s'.format(color))
+    # Accept color as hex
+    print('Setting solid color to: {}'.format(color))
+    rgb_color = ImageColor.getrgb(color)
+    print('Color as rgb: {}'.format(rgb_color))
+    print('type of rgb_color: {}'.format(type(rgb_color)))
+    print('RGB [0], [1], [2]: {}, {}, {}'.format(rgb_color[0], rgb_color[1], rgb_color[2]))
+    strip.begin()
+
     for i in range(strip.numPixels()):
-        strip.setPixelColor(i, toRgb(color))
+        strip.setPixelColor(i, Color(rgb_color[0], rgb_color[1], rgb_color[2]))
+        strip.show()
 
 def fadeBetween(strip, colors, wait_ms=10):
     for i, color in colors:
-        diffR = abs(toRgb(color)[0] - toRgb(colors[i+1])[0])
+        diffR = abs(ImageColor.getrgb(color)[0] - ImageColor.getrgb(colors[i+1])[0])
         # Green + blue..
         return diffR
 
 
 def makeStrip(brightness):
-    strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, brightness, LED_CHANNEL)
+    strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, int(brightness), LED_CHANNEL)
     return strip
 
+
 def setup():
+    # Process arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
+
+    args = parser.parse_args()
+
+    print('Press Ctrl-C to quit.')
+    if not args.clear:
+        print('Use "-c" argument to clear LEDs on exit')
+
+
 
     consumer = KafkaConsumer(
         'applyScene',
         bootstrap_servers=[config('KAFKA_URL')],
-        auto_offset_reset='earliest',
-        enable_auto_commit=True,
-        group_id='pi',
         value_deserializer=lambda x: loads(x.decode('utf-8')),
+        auto_offset_reset='latest',
         api_version=(0,10,1)
     )
 
-    while True:
-        for message in consumer:
-            print(message)
-            message = message.value
+    awaitMsgs = True
 
-            switcher = {
-                "solidColorFromHex": solidColorFromHex(makeStrip(message.defaultBrightness), message.colors[0]),
-                "fadeBetween": fadeBetween(makeStrip(message.defaultBrightness)),
-            }
-            switcher.get(message.functionCall, "Invalid functionCall")
+    while awaitMsgs:
+        try:
+            for message in consumer:
+                message = message.value
+                print(message)
+                strip = makeStrip(message['defaultBrightness'])
 
+                switcher = {
+                    "solidColorFromHex": solidColorFromHex(strip, message['colors'][0]),
+                    "fadeBetween": fadeBetween(strip, message['colors']),
+                }
+                switcher.get(message.functionCall, "Invalid functionCall")
+
+        except KeyboardInterrupt:
+            if args.clear:
+                colorWipe(strip, Color(0, 0, 0), 10)
+            sys.exit(0)
+        except:
+            if args.clear:
+                colorWipe(strip, Color(0, 0, 0), 10)
+            sys.exit(0)
 
 
 if __name__ == "__main__":
