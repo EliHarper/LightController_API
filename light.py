@@ -11,7 +11,8 @@ sys.path.insert(0, "/home/pi/.local/lib/python3.7/site-packages")
 from kafka import KafkaConsumer
 from json import loads
 from decouple import config
-from PIL import ImageColor
+from colors import hex, rgb
+import traceback
 
 # LED strip configuration:
 LED_COUNT      = 300     # Number of LED pixels.
@@ -94,23 +95,35 @@ class Delta:
 #     hex = hex.lstrip('#')
 #     return tuple(int(hex[i:i + 2], 16) for i in (0, 2, 4))
 
+def convertToRgb(strippedHex):
+    tupley = []
+    split = str(hex(strippedHex).rgb).split(', ')
+    for val in split:
+        try:
+            tupley.append(int(val))
+        except Exception as e:
+            print(e + " in convertToRgb")
+
+    return tupley
 
 def solidColorFromHex(strip, color, wait_ms=10):
+    color = color[0]
     # Accept color as hex
     print('Setting solid color to: {}'.format(color))
-    rgb_color = ImageColor.getrgb(color)
-    print('Color as rgb: {}'.format(rgb_color))
-    print('type of rgb_color: {}'.format(type(rgb_color)))
-    print('RGB [0], [1], [2]: {}, {}, {}'.format(rgb_color[0], rgb_color[1], rgb_color[2]))
+    stripped = color.lstrip('#')
+    stripped = stripped[:6]
+    rgbTuple = convertToRgb(stripped)
+    print('rgb: {}'.format(rgbTuple))
+    print('RGB [0], [1], [2]: {}, {}, {}'.format(str(rgbTuple[0]), str(rgbTuple[1]), str(rgbTuple[2])))
     strip.begin()
 
     for i in range(strip.numPixels()):
-        strip.setPixelColor(i, Color(rgb_color[0], rgb_color[1], rgb_color[2]))
+        strip.setPixelColor(i, Color(rgbTuple[1], rgbTuple[0], rgbTuple[2]))
         strip.show()
 
 def fadeBetween(strip, colors, wait_ms=10):
     for i, color in colors:
-        diffR = abs(ImageColor.getrgb(color)[0] - ImageColor.getrgb(colors[i+1])[0])
+        diffR = abs(hex(color)[0] - hex(colors[i+1])[0])
         # Green + blue..
         return diffR
 
@@ -151,16 +164,23 @@ def setup():
                 strip = makeStrip(message['defaultBrightness'])
 
                 switcher = {
-                    "solidColorFromHex": solidColorFromHex(strip, message['colors'][0]),
-                    "fadeBetween": fadeBetween(strip, message['colors']),
+                    "solidColorFromHex": solidColorFromHex,
+                    "fadeBetween": fadeBetween,
                 }
-                switcher.get(message.functionCall, "Invalid functionCall")
+
+                switcher[message['functionCall']](strip, message['colors'])
 
         except KeyboardInterrupt:
             if args.clear:
                 colorWipe(strip, Color(0, 0, 0), 10)
             sys.exit(0)
-        except:
+        except Exception as e:
+            print(e)
+            exc_info = sys.exc_info()
+        finally:
+            # Display the *original* exception
+            traceback.print_exception(*exc_info)
+            del exc_info
             if args.clear:
                 colorWipe(strip, Color(0, 0, 0), 10)
             sys.exit(0)
