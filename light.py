@@ -91,10 +91,6 @@ class Delta:
         self.increase = increase
 
 
-# def toRgb(hex):
-#     hex = hex.lstrip('#')
-#     return tuple(int(hex[i:i + 2], 16) for i in (0, 2, 4))
-
 def convertToRgb(strippedHex):
     tupley = []
     split = str(hex(strippedHex).rgb).split(', ')
@@ -111,26 +107,39 @@ def solidColorFromHex(strip, color, wait_ms=10):
     # Accept color as hex
     print('Setting solid color to: {}'.format(color))
     stripped = color.lstrip('#')
+    # colors.py rgb conversion only accepts hex colors with 6 chars:
     stripped = stripped[:6]
+    # Extracting ints from RgbColor object, which stores them as strings
     rgbTuple = convertToRgb(stripped)
     print('rgb: {}'.format(rgbTuple))
     print('RGB [0], [1], [2]: {}, {}, {}'.format(str(rgbTuple[0]), str(rgbTuple[1]), str(rgbTuple[2])))
     strip.begin()
 
     for i in range(strip.numPixels()):
+        # No idea why, but this function accepts in format GRB..
         strip.setPixelColor(i, Color(rgbTuple[1], rgbTuple[0], rgbTuple[2]))
         strip.show()
 
 def fadeBetween(strip, colors, wait_ms=10):
     for i, color in colors:
         diffR = abs(hex(color)[0] - hex(colors[i+1])[0])
-        # Green + blue..
+        # Repeat for green + blue..
         return diffR
 
 
 def makeStrip(brightness):
     strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, int(brightness), LED_CHANNEL)
     return strip
+
+
+def createKafkaConsumer():
+    return KafkaConsumer(
+        'applyScene',
+        bootstrap_servers=[config('KAFKA_URL')],
+        value_deserializer=lambda x: loads(x.decode('utf-8')),
+        auto_offset_reset='latest',
+        api_version=(0,10,1)
+    )    
 
 
 def setup():
@@ -144,15 +153,7 @@ def setup():
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
 
-
-
-    consumer = KafkaConsumer(
-        'applyScene',
-        bootstrap_servers=[config('KAFKA_URL')],
-        value_deserializer=lambda x: loads(x.decode('utf-8')),
-        auto_offset_reset='latest',
-        api_version=(0,10,1)
-    )
+    consumer = createKafkaConsumer()
 
     awaitMsgs = True
 
