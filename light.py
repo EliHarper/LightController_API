@@ -84,7 +84,7 @@ def theaterChaseRainbow(strip, wait_ms=50):
 
 # Personal Additions: #
 
-
+# Helpers:
 class Delta:
     def __init__(self, range, rate, increase=True):
         self.range = range
@@ -100,8 +100,14 @@ def convert_to_rgb(colors):
 
     return tupleys
 
+# Action functions:
+# Administrative:
+def turn_off(strip, colors=(0,0,0)):
+    colorWipe(strip, Color(colors), 10)
+    sys.exit(0)
 
-def paint_with_colors(strip, colors, wait_ms=10):
+# Scenes:
+def paint_with_colors(strip, colors):
     # Accept color as hex
     print('Setting solid color to: {}'.format(colors))
     # Extracting ints from RgbColor object, which stores them as strings
@@ -119,6 +125,20 @@ def paint_with_colors(strip, colors, wait_ms=10):
         # No idea why, but this function accepts in format GRB..
         strip.setPixelColor(i, Color(green, red, blue))
         strip.show()
+
+
+def fire_projectiles(strip, colors, projectile_size=3):
+    rgb_tuples = convert_to_rgb(colors)
+
+    while True:
+        for tuple in rgb_tuples:
+            red, green, blue = tuple
+            for i in range(strip.numPixels()):
+                strip.setPixelColor(i, Color(green, red, blue))
+                strip.show()
+                if i > projectile_size:
+                    strip.setPixelColor(i - projectile_size, Color(0,0,0))
+
 
 
 def fade_between(strip, colors, wait_ms=10):
@@ -173,8 +193,12 @@ def setup():
 
                 switcher = {
                     "paint_static_colors": paint_with_colors,
-                    "fade_between": fade_between,
+                    "fade_between": fire_projectiles,
+                    "off": turn_off,
                 }
+
+                if message['functionCall'] == "off":
+                    switcher[message['functionCall']](strip)
 
                 switcher[message['functionCall']](strip, message['colors'])
 
