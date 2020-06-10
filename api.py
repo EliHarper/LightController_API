@@ -5,7 +5,6 @@ from flask import Flask, request, Blueprint
 from kafka import KafkaProducer
 from decouple import config
 
-from actions import apply
 from application import create_app
 
 

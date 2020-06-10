@@ -84,6 +84,7 @@ def theaterChaseRainbow(strip, wait_ms=50):
 
 # Personal Additions: #
 
+
 class Delta:
     def __init__(self, range, rate, increase=True):
         self.range = range
@@ -91,48 +92,48 @@ class Delta:
         self.increase = increase
 
 
-def convertToRgb(strippedHex):
-    tupley = []
-    split = str(hex(strippedHex).rgb).split(', ')
-    for val in split:
-        try:
-            tupley.append(int(val))
-        except Exception as e:
-            print(e + " in convertToRgb")
+def convert_to_rgb(colors):
+    tupleys = []
+    for hex_color in colors:
+        hex_color = hex_color.lstrip('#')
+        tupleys.append(tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)))
 
-    return tupley
+    return tupleys
 
-def solidColorFromHex(strip, color, wait_ms=10):
-    color = color[0]
+
+def paint_with_colors(strip, colors, wait_ms=10):
     # Accept color as hex
-    print('Setting solid color to: {}'.format(color))
-    stripped = color.lstrip('#')
-    # colors.py rgb conversion only accepts hex colors with 6 chars:
-    stripped = stripped[:6]
+    print('Setting solid color to: {}'.format(colors))
     # Extracting ints from RgbColor object, which stores them as strings
-    rgbTuple = convertToRgb(stripped)
-    print('rgb: {}'.format(rgbTuple))
-    print('RGB [0], [1], [2]: {}, {}, {}'.format(str(rgbTuple[0]), str(rgbTuple[1]), str(rgbTuple[2])))
-    strip.begin()
+    rgb_tuples = convert_to_rgb(colors)
+    print('RGBs: {}'.format(rgb_tuples))
+    range_per_color = strip.numPixels() / len(rgb_tuples)
+    range_per_color = int(range_per_color)
+    rgb_tuple_index = 0
 
     for i in range(strip.numPixels()):
+        # Make the strip show even(ish) amounts of each color, with remainder applied to last color
+        if i % range_per_color == 0 and rgb_tuple_index < len(rgb_tuples):
+            red, green, blue = rgb_tuples[rgb_tuple_index]
+            rgb_tuple_index += 1
         # No idea why, but this function accepts in format GRB..
-        strip.setPixelColor(i, Color(rgbTuple[1], rgbTuple[0], rgbTuple[2]))
+        strip.setPixelColor(i, Color(green, red, blue))
         strip.show()
 
-def fadeBetween(strip, colors, wait_ms=10):
+
+def fade_between(strip, colors, wait_ms=10):
     for i, color in colors:
         diffR = abs(hex(color)[0] - hex(colors[i+1])[0])
         # Repeat for green + blue..
         return diffR
 
 
-def makeStrip(brightness):
+def make_strip(brightness):
     strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, int(brightness), LED_CHANNEL)
     return strip
 
 
-def createKafkaConsumer():
+def create_kafka_consumer():
     return KafkaConsumer(
         'applyScene',
         bootstrap_servers=[config('KAFKA_URL')],
@@ -153,20 +154,26 @@ def setup():
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
 
-    consumer = createKafkaConsumer()
+    consumer = create_kafka_consumer()
 
-    awaitMsgs = True
+    await_msgs = True
+    strip = None
 
-    while awaitMsgs:
+    while await_msgs:
         try:
             for message in consumer:
                 message = message.value
                 print(message)
-                strip = makeStrip(message['defaultBrightness'])
+
+                if strip is None:
+                    strip = make_strip(message['defaultBrightness'])
+                    strip.begin()
+                else:
+                    strip.setBrightness(int(message['defaultBrightness']))
 
                 switcher = {
-                    "solidColorFromHex": solidColorFromHex,
-                    "fadeBetween": fadeBetween,
+                    "paint_static_colors": paint_with_colors,
+                    "fade_between": fade_between,
                 }
 
                 switcher[message['functionCall']](strip, message['colors'])
