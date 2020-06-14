@@ -11,7 +11,6 @@ sys.path.insert(0, "/home/pi/.local/lib/python3.7/site-packages")
 from kafka import KafkaConsumer
 from json import loads
 from decouple import config
-from colors import hex, rgb
 import traceback
 
 # LED strip configuration:
@@ -120,6 +119,18 @@ def paint_with_colors(strip, colors, wait_ms=10):
         strip.setPixelColor(i, Color(green, red, blue))
         strip.show()
 
+def fire_projectiles(strip, colors, projectile_size=3):
+    rgb_tuples = convert_to_rgb(colors)
+
+    while True:
+        for tuple in rgb_tuples:
+            red, green, blue = tuple
+            for i in range(strip.numPixels()):
+                strip.setPixelColor(i, Color(green, red, blue))
+                strip.show()
+                if i > projectile_size:
+                    strip.setPixelColor(i - projectile_size, Color(0,0,0))
+
 
 def fade_between(strip, colors, wait_ms=10):
     for i, color in colors:
@@ -173,7 +184,7 @@ def setup():
 
                 switcher = {
                     "paint_static_colors": paint_with_colors,
-                    "fade_between": fade_between,
+                    "fade_between": fire_projectiles,
                 }
 
                 switcher[message['functionCall']](strip, message['colors'])
