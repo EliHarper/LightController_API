@@ -103,7 +103,7 @@ def convert_to_rgb(colors):
 # Administrative:
 def turn_off(strip, colors=(0,0,0)):
     colorWipe(strip, Color(colors), 10)
-    sys.exit(0)
+
 
 # Scenes:
 def paint_with_colors(strip, colors):
@@ -196,6 +196,13 @@ def setup():
                 message = message.value
                 print(message)
 
+                print(message['functionCall'])
+
+                if message['functionCall'] == {"functionCall": "off"}:
+                    if strip is not None:
+                        turn_off(strip)
+                        break
+
                 if strip is None:
                     strip = make_strip(message['defaultBrightness'])
                     strip.begin()
@@ -205,10 +212,10 @@ def setup():
                 switcher = {
                     "paint_static_colors": paint_with_colors,
                     "fade_between": fire_projectiles,
+                    "off": turn_off,
+                    # "animated": , <- Make some clever shit here that deciphers
+                    #                    glow from projectile and calls the respective
                 }
-
-                if message['functionCall'] == "off":
-                    switcher[message['functionCall']](strip)
 
                 switcher[message['functionCall']](strip, message['colors'])
 

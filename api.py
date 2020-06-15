@@ -1,3 +1,5 @@
+import json
+
 from bson import json_util, BSON
 from bson.objectid import ObjectId
 from pymongo import MongoClient
@@ -25,6 +27,14 @@ scenes = db.scenes
 def home():
     docs = scenes.find()
     return json_util.dumps(docs)
+
+
+@api.route('/off', methods=['GET'])
+def off():
+    msg = {'functionCall': 'off'}
+    json_msg = json.dumps(msg)
+    producer.send('applyScene', json_msg)
+    return 'Turned off.'
 
 @api.route('/scene/<string:scene_id>', methods=['GET'])
 def applyScene(scene_id):
