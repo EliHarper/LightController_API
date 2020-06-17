@@ -3,6 +3,7 @@
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
 from neopixel import *
+import threading
 import argparse
 import time
 import sys
@@ -101,8 +102,68 @@ def convert_to_rgb(colors):
 
 # Action functions:
 # Administrative:
-def turn_off(strip, colors=(0,0,0)):
-    colorWipe(strip, Color(colors), 10)
+def create_kafka_consumer():
+    return KafkaConsumer(
+        'applyScene',
+        bootstrap_servers=[config('KAFKA_URL')],
+        value_deserializer=lambda x: loads(x.decode('utf-8')),
+        auto_offset_reset='latest',
+        api_version=(0,10,1)
+    )
+
+
+def turn_off(strip):
+    colorWipe(strip, Color(0,0,0), 10)
+
+
+def make_strip(brightness):
+    strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, int(brightness), LED_CHANNEL)
+    return strip
+
+
+def animation_handler(strip, colors, animation):
+    global stop_animation
+    while not stop_animation:
+        switcher = {
+            "Projectile": fire_projectiles,
+            "Breathe": breathe,
+        }
+        switcher[animation](strip, colors)
+
+
+def handle_ending_animation(strip, message):
+    global stop_animation
+    # Short-circuit in the event of a "turn off" message:
+    if message['functionCall'] == "off":
+        if strip is not None:
+            stop_animation = True
+            print('Received call for turn_off')
+            print(stop_animation)
+            turn_off(strip)
+            scene.join()
+            stop_animation = False
+            # Returning False tells the main loop to just wait for the next message
+            #   instead of handling it further as if it were a scene
+            return False
+    else:
+        try:
+            # Check if the changed-to scene is the same as the last - if not, tell the thread to end.
+            if prev_message['_id']['$oid'] == message['_id']['$oid']:
+                # Don't bother with re-applying the same scene:
+                return False
+            else:
+                if prev_message['animated']:
+                    # Tell animated function to end, then wait for it to do so before continuing.
+                    stop_animation = True
+                    scene.join()
+                    stop_animation = False
+
+                return True
+        # If animation_id is unset (first animation since app start), initialize stop_animation to False:
+        except NameError:
+            stop_animation = False
+            return True
+
 
 
 # Scenes:
@@ -125,31 +186,39 @@ def paint_with_colors(strip, colors):
         strip.setPixelColor(i, Color(green, red, blue))
         strip.show()
 
-def fire_projectiles(strip, colors, projectile_size=3):
+
+def fire_projectiles(strip, colors, projectile_size=8):
+    global stop_animation
     rgb_tuples = convert_to_rgb(colors)
 
-    while True:
+    while not stop_animation:
         for tuple in rgb_tuples:
+            if stop_animation:
+                break
             red, green, blue = tuple
             for i in range(strip.numPixels()):
                 strip.setPixelColor(i, Color(green, red, blue))
                 strip.show()
-                if i > projectile_size:
+                # i => head of projectile
+                if i > (projectile_size - 1):
                     strip.setPixelColor(i - projectile_size, Color(0,0,0))
 
 
-def fire_projectiles(strip, colors, projectile_size=3):
-    rgb_tuples = convert_to_rgb(colors)
+def breathe(strip, colors):
+    global stop_animation
+    paint_with_colors(strip, colors)
 
-    while True:
-        for tuple in rgb_tuples:
-            red, green, blue = tuple
-            for i in range(strip.numPixels()):
-                strip.setPixelColor(i, Color(green, red, blue))
-                strip.show()
-                if i > projectile_size:
-                    strip.setPixelColor(i - projectile_size, Color(0,0,0))
-
+    while not stop_animation:
+        # Increase brightness from 155 -> 255 (breathe upswing)
+        for i in range(1, 128):
+            strip.setBrightness(int(i))
+            strip.show()
+            time.sleep(1/1000)
+        # Decrease brightness from 254 -> 156 (breathe downswing)
+        for i in range(1, 127):
+            strip.setBrightness(int(128-i))
+            strip.show()
+            time.sleep(1/1000)
 
 
 def fade_between(strip, colors, wait_ms=10):
@@ -159,22 +228,9 @@ def fade_between(strip, colors, wait_ms=10):
         return diffR
 
 
-def make_strip(brightness):
-    strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, int(brightness), LED_CHANNEL)
-    return strip
 
 
-def create_kafka_consumer():
-    return KafkaConsumer(
-        'applyScene',
-        bootstrap_servers=[config('KAFKA_URL')],
-        value_deserializer=lambda x: loads(x.decode('utf-8')),
-        auto_offset_reset='latest',
-        api_version=(0,10,1)
-    )    
-
-
-def setup():
+def run():
     # Process arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
@@ -190,18 +246,19 @@ def setup():
     await_msgs = True
     strip = None
 
+    global prev_message
+    global scene
+    global stop_animation
+
     while await_msgs:
         try:
             for message in consumer:
                 message = message.value
                 print(message)
-
                 print(message['functionCall'])
 
-                if message['functionCall'] == {"functionCall": "off"}:
-                    if strip is not None:
-                        turn_off(strip)
-                        break
+                if not handle_ending_animation(strip, message):
+                    break
 
                 if strip is None:
                     strip = make_strip(message['defaultBrightness'])
@@ -209,15 +266,14 @@ def setup():
                 else:
                     strip.setBrightness(int(message['defaultBrightness']))
 
-                switcher = {
-                    "paint_static_colors": paint_with_colors,
-                    "fade_between": fire_projectiles,
-                    "off": turn_off,
-                    # "animated": , <- Make some clever shit here that deciphers
-                    #                    glow from projectile and calls the respective
-                }
+                if message['animated']:
+                    scene = threading.Thread(target = animation_handler, args=(strip, message['colors'], message['animation']))
+                else:
+                    scene = threading.Thread(target = paint_with_colors, args=(strip, message['colors']))
 
-                switcher[message['functionCall']](strip, message['colors'])
+                scene.start()
+                prev_message = message
+
 
         except KeyboardInterrupt:
             if args.clear:
@@ -226,7 +282,6 @@ def setup():
         except Exception as e:
             print(e)
             exc_info = sys.exc_info()
-        finally:
             # Display the *original* exception
             traceback.print_exception(*exc_info)
             del exc_info
@@ -236,4 +291,4 @@ def setup():
 
 
 if __name__ == "__main__":
-    setup()
+    run()

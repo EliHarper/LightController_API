@@ -10,6 +10,12 @@ from decouple import config
 from application import create_app
 
 
+class Message:
+    def __init__(self, functionCall = 'off'):
+        self.functionCall = functionCall
+
+
+
 app = create_app()
 api = Blueprint("api", __name__)
 app.register_blueprint(api, url_prefix="/api")
@@ -31,9 +37,10 @@ def home():
 
 @api.route('/off', methods=['GET'])
 def off():
-    msg = {'functionCall': 'off'}
-    json_msg = json.dumps(msg)
-    producer.send('applyScene', json_msg)
+    msg = Message()
+    # json_msg = json.dumps(msg.__dict__)
+    # print(json_msg)
+    producer.send('applyScene', msg.__dict__)
     return 'Turned off.'
 
 @api.route('/scene/<string:scene_id>', methods=['GET'])
@@ -44,6 +51,7 @@ def applyScene(scene_id):
     print("applied")
     return "applied"
 
+
 @api.route('/scene/create', methods=['POST', 'OPTIONS'])
 def createScene():
     if request.method == 'OPTIONS':
@@ -52,6 +60,7 @@ def createScene():
     jsonDoc = request.get_json()
     newId = scenes.insert_one(jsonDoc).inserted_id
     return str(newId)
+
 
 @api.route('/scene/<string:scene_id>', methods=['DELETE', 'OPTIONS'])
 def deleteScene(scene_id):
