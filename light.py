@@ -12,6 +12,7 @@ sys.path.insert(0, "/home/pi/.local/lib/python3.7/site-packages")
 from kafka import KafkaConsumer
 from json import loads
 from decouple import config
+from random import seed, randint
 import traceback
 
 # LED strip configuration:
@@ -127,6 +128,7 @@ def animation_handler(strip, colors, animation):
         switcher = {
             "Projectile": fire_projectiles,
             "Breathe": breathe,
+            "Twinkle": twinkle
         }
         switcher[animation](strip, colors)
 
@@ -137,8 +139,6 @@ def handle_ending_animation(strip, message):
     if message['functionCall'] == "off":
         if strip is not None:
             stop_animation = True
-            print('Received call for turn_off')
-            print(stop_animation)
             turn_off(strip)
             scene.join()
             stop_animation = False
@@ -221,12 +221,47 @@ def breathe(strip, colors):
             time.sleep(1/1000)
 
 
+def twinkle(strip, colors, pct_lit=.3):
+    seed(14)
+
+    tupleys = convert_to_rgb(colors)
+    pixel_list = list(range(0, strip.numPixels()))
+    indices_and_tupleys = dict({})
+
+    for i in range(int(strip.numPixels() * pct_lit)):
+        pixel_list_index = randint(0, len(pixel_list) - 1)
+        scaled_light_index = pixel_list.pop(pixel_list_index)
+        random_color_index = randint(0, len(tupleys) - 1)
+        indices_and_tupleys.update({scaled_light_index : tupleys[random_color_index]})
+
+    for pixel, color in indices_and_tupleys.items():
+        red, green, blue = color
+        strip.setPixelColor(pixel, Color(green, red, blue))
+        strip.show()
+
+    while not stop_animation:
+        for _ in indices_and_tupleys.keys():
+            off_index_of_dict = randint(0, len(indices_and_tupleys.keys()) - 1)
+            off_index = list(indices_and_tupleys.keys())[off_index_of_dict]
+            on_index = randint(0, len(pixel_list) - 1)
+            on_color_index = randint(0, len(tupleys) - 1)
+            red, green, blue = tupleys[on_color_index]
+
+            strip.setPixelColor(off_index, Color(0, 0, 0))
+            strip.show()
+            pixel_list.append(off_index)
+
+            strip.setPixelColor(on_index, Color(green, red, blue))
+            strip.show()
+            pixel_list.pop(on_index)
+
+
+
 def fade_between(strip, colors, wait_ms=10):
     for i, color in colors:
         diffR = abs(hex(color)[0] - hex(colors[i+1])[0])
         # Repeat for green + blue..
         return diffR
-
 
 
 
