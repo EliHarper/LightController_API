@@ -12,6 +12,7 @@ sys.path.insert(0, "/home/pi/.local/lib/python3.7/site-packages")
 from kafka import KafkaConsumer
 from json import loads
 from decouple import config
+from multiprocessing import Process
 import traceback
 
 # LED strip configuration:
@@ -187,21 +188,28 @@ def paint_with_colors(strip, colors):
         strip.show()
 
 
-def fire_projectiles(strip, colors, projectile_size=8):
+def fire_projectiles(strip, colors, projectile_size=8, fractional_distance=2):
     global stop_animation
     rgb_tuples = convert_to_rgb(colors)
 
     while not stop_animation:
-        for tuple in rgb_tuples:
-            if stop_animation:
+        for index in (0, len(rgb_tuples), fractional_distance):
+            if stop_animation or index >= len(rgb_tuples) - 1:
                 break
-            red, green, blue = tuple
-            for i in range(strip.numPixels()):
-                strip.setPixelColor(i, Color(green, red, blue))
-                strip.show()
-                # i => head of projectile
-                if i > (projectile_size - 1):
-                    strip.setPixelColor(i - projectile_size, Color(0,0,0))
+            fire_one(strip, rgb_tuples, index, projectile_size, fractional_distance)
+
+
+def fire_one(strip, rgb_tuples, index, projectile_size, fractional_distance):
+    red, green, blue = rgb_tuples[index]
+    for i in range(strip.numPixels()):
+        if i == (strip.numPixels() / fractional_distance) and index <= len(rgb_tuples) - 2:
+            firing = Process(target=fire_one, args=(strip, rgb_tuples, index + 1, projectile_size, fractional_distance))
+            firing.start()
+        strip.setPixelColor(i, Color(green, red, blue))
+        strip.show()
+        # i => head of projectile
+        if i > (projectile_size - 1):
+            strip.setPixelColor(i - projectile_size, Color(0, 0, 0))
 
 
 def breathe(strip, colors):
