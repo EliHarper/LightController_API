@@ -25,6 +25,7 @@ producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
                          json_util.dumps(x).encode('utf-8'))
 
 mongoClient = MongoClient([config('DB_URL')])
+mongoClient.server_info()
 db = mongoClient.lightdb
 scenes = db.scenes
 

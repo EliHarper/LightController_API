@@ -1,0 +1,7 @@
+bson
+flask
+flask_cors
+pymongo
+kafka-python
+python-decouple
+git+https://github.com/benoitc/gunicorn.git
