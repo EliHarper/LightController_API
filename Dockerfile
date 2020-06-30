@@ -14,7 +14,7 @@ RUN mkdir /app
 WORKDIR /app/
 
 # Add the program files and their supporting env info:
-COPY ["./api.py", "./.env", "./env", "./application.py", "./requirements.txt", "./docker_startup.sh", "/app/"]
+COPY ["./api.py", "./.env", "./env", "./application.py", "./requirements.txt", "/app/"]
 
 RUN ls -la /app
 
@@ -23,7 +23,7 @@ RUN cd /app && pip3 install -r ./requirements.txt --trusted-host pypi.org --trus
 
 RUN ls -la /app ; pwd
 
-EXPOSE 5000
+EXPOSE 5001
 
 RUN cd /app
 # Run the program:
