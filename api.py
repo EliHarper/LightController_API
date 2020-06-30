@@ -20,14 +20,14 @@ app = create_app()
 api = Blueprint("api", __name__)
 app.register_blueprint(api, url_prefix="/api")
 
-producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
-                         value_serializer=lambda x:
-                         json_util.dumps(x).encode('utf-8'))
-
 mongoClient = MongoClient([config('DB_URL')])
 mongoClient.server_info()
 db = mongoClient.lightdb
 scenes = db.scenes
+
+producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
+                         value_serializer=lambda x:
+                         json_util.dumps(x).encode('utf-8'))
 
 
 @api.route('/scenes', methods=['GET'])
