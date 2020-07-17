@@ -2,6 +2,8 @@
 
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
+import boto3
+
 from neopixel import *
 import threading
 import argparse
@@ -111,6 +113,15 @@ def create_kafka_consumer():
         auto_offset_reset='latest',
         api_version=(0,10,1)
     )
+
+
+def set_up_sqs():
+    # Set the region for botocore:
+    boto3.setup_default_session(region_name='us-east-1')
+    sqs = boto3.resource('sqs',
+                         aws_access_key_id=config('ACCESS_ID'),
+                         aws_secret_access_key=config('ACCESS_KEY'))
+    return sqs.get_queue_by_name(QueueName='LightQueue.fifo')
 
 
 def turn_off(strip):
@@ -276,7 +287,8 @@ def run():
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
 
-    consumer = create_kafka_consumer()
+    # consumer = create_kafka_consumer()
+    queue = set_up_sqs()
 
     await_msgs = True
     strip = None
@@ -287,8 +299,8 @@ def run():
 
     while await_msgs:
         try:
-            for message in consumer:
-                message = message.value
+            for message in queue.receive_messages():
+                message = message.body
                 print(message)
                 print(message['functionCall'])
 
@@ -308,6 +320,7 @@ def run():
 
                 scene.start()
                 prev_message = message
+                message.delete()
 
 
         except KeyboardInterrupt:

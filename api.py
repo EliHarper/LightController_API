@@ -8,6 +8,7 @@ from kafka import KafkaProducer
 from decouple import config
 
 from application import create_app
+import SQS
 
 
 class Message:
@@ -25,9 +26,9 @@ mongoClient.server_info()
 db = mongoClient.lightdb
 scenes = db.scenes
 
-producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
-                         value_serializer=lambda x:
-                         json_util.dumps(x).encode('utf-8'))
+# producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
+#                          value_serializer=lambda x:
+#                          json_util.dumps(x).encode('utf-8'))
 
 
 @api.route('/scenes', methods=['GET'])
@@ -39,16 +40,17 @@ def home():
 @api.route('/off', methods=['GET'])
 def off():
     msg = Message()
-    # json_msg = json.dumps(msg.__dict__)
-    # print(json_msg)
-    producer.send('applyScene', msg.__dict__)
+    SQS.applySceneSQS(msg.__dict__)
+    # producer.send('applyScene', msg.__dict__)
     return 'Turned off.'
+
 
 @api.route('/scene/<string:scene_id>', methods=['GET'])
 def applyScene(scene_id):
     print("Hit function")
     toApply = scenes.find_one({"_id": ObjectId(scene_id)})
-    producer.send('applyScene', toApply)
+    # producer.send('applyScene', toApply)
+    SQS.applySceneSQS(toApply)
     print("applied")
     return "applied"
 
