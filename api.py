@@ -1,10 +1,7 @@
-import json
-
 from bson import json_util, BSON
 from bson.objectid import ObjectId
 from pymongo import MongoClient
 from flask import Flask, request, Blueprint
-from kafka import KafkaProducer
 from decouple import config
 
 from application import create_app
@@ -93,4 +90,4 @@ def updateScene():
 
 
 app.register_blueprint(api, url_prefix="/api")
-app.run(host='0.0.0.0', port=5001)
+app.run(host='0.0.0.0', port=5000)

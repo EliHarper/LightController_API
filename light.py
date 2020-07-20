@@ -5,13 +5,14 @@
 import boto3
 
 from neopixel import *
-import threading
+import json
 import argparse
+import threading
 import time
 import sys
 
 sys.path.insert(0, "/home/pi/.local/lib/python3.7/site-packages")
-from kafka import KafkaConsumer
+#from kafka import KafkaConsumer
 from json import loads
 from decouple import config
 from random import seed, randint
@@ -105,14 +106,14 @@ def convert_to_rgb(colors):
 
 # Action functions:
 # Administrative:
-def create_kafka_consumer():
-    return KafkaConsumer(
-        'applyScene',
-        bootstrap_servers=[config('KAFKA_URL')],
-        value_deserializer=lambda x: loads(x.decode('utf-8')),
-        auto_offset_reset='latest',
-        api_version=(0,10,1)
-    )
+# def create_kafka_consumer():
+#     return KafkaConsumer(
+#         'applyScene',
+#         bootstrap_servers=[config('KAFKA_URL')],
+#         value_deserializer=lambda x: loads(x.decode('utf-8')),
+#         auto_offset_reset='latest',
+#         api_version=(0,10,1)
+#     )
 
 
 def set_up_sqs():
@@ -299,8 +300,9 @@ def run():
 
     while await_msgs:
         try:
-            for message in queue.receive_messages():
-                message = message.body
+            for message_str in queue.receive_messages():
+                message_str = message_str.body
+                message = json.loads(message_str)
                 print(message)
                 print(message['functionCall'])
 
@@ -320,7 +322,7 @@ def run():
 
                 scene.start()
                 prev_message = message
-                message.delete()
+                
 
 
         except KeyboardInterrupt:
