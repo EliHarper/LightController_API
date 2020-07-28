@@ -39,8 +39,6 @@ def home():
 @api.route('/off', methods=['GET'])
 def off():
     msg = Message()
-    # json_msg = json.dumps(msg.__dict__)
-    # print(json_msg)
     producer.send('applyScene', msg.__dict__)
     return 'Turned off.'
 
