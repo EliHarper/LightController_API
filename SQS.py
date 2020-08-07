@@ -27,3 +27,4 @@ def applySceneSQS(scene):
         MessageBody = scene_str,
         MessageGroupId='scenes'
     )
+    print(response)

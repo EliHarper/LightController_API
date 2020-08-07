@@ -5,6 +5,7 @@
 import boto3
 
 from neopixel import *
+from Scene import Scene
 import json
 import argparse
 import threading
@@ -27,6 +28,14 @@ LED_BRIGHTNESS = 255     # Set to 0 for darkest and 255 for brightest
 LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
+prev_message: Scene
+
+
+def fastWipe(strip, color):
+    """Wipe color REAL QUICK across display a pixel at a time."""
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, color)
+        strip.show()
 
 
 # Define functions which animate LEDs in various ways.
@@ -106,17 +115,9 @@ def convert_to_rgb(colors):
 
 # Action functions:
 # Administrative:
-# def create_kafka_consumer():
-#     return KafkaConsumer(
-#         'applyScene',
-#         bootstrap_servers=[config('KAFKA_URL')],
-#         value_deserializer=lambda x: loads(x.decode('utf-8')),
-#         auto_offset_reset='latest',
-#         api_version=(0,10,1)
-#     )
-
-
 def set_up_sqs():
+    global sqs
+
     # Set the region for botocore:
     boto3.setup_default_session(region_name='us-east-1')
     sqs = boto3.resource('sqs',
@@ -126,41 +127,59 @@ def set_up_sqs():
 
 
 def turn_off(strip):
-    colorWipe(strip, Color(0,0,0), 10)
+    fastWipe(strip, Color(0,0,0))
 
 
-def make_strip(brightness):
+def make_strip(brightness=0):
     strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, int(brightness), LED_CHANNEL)
     return strip
 
 
 def animation_handler(strip, colors, animation):
+    switcher = {
+        "Projectile": fire_projectiles,
+        "Breathe": breathe,
+        "Twinkle": twinkle,
+        "Fade": fade_between
+    }
+    switcher[animation](strip, colors)
+
+
+def end_animation(strip):
     global stop_animation
-    while not stop_animation:
-        switcher = {
-            "Projectile": fire_projectiles,
-            "Breathe": breathe,
-            "Twinkle": twinkle
-        }
-        switcher[animation](strip, colors)
+    stop_animation = True
+
+    # Make a thread of the turn_off function; release execution lock when wipe is finished.
+    scene = threading.Thread(target=turn_off, args=(strip,))
+    scene.start()
+    scene.join()
+
+    stop_animation = False
 
 
 def handle_ending_animation(strip, message):
+    print('handle_ending_animation():')
+
     global stop_animation
+    global scene
+
     # Short-circuit in the event of a "turn off" message:
     if message['functionCall'] == "off":
-        if strip is not None:
-            stop_animation = True
-            turn_off(strip)
-            scene.join()
-            stop_animation = False
-            # Returning False tells the main loop to just wait for the next message
-            #   instead of handling it further as if it were a scene
-            return False
+        try:
+            end_animation(strip)
+        except UnboundLocalError:
+            # Only reached in the case of an 'off' message waiting in the queue on startup:
+            strip = make_strip()
+            end_animation(strip)
+
+        # Returning False tells the main loop to just wait for the next message
+        #   instead of handling it further as if it were a scene
+        return False
     else:
         try:
+            print('type(prev_message): {}'.format(type(prev_message)))
             # Check if the changed-to scene is the same as the last - if not, tell the thread to end.
-            if prev_message['_id']['$oid'] == message['_id']['$oid']:
+            if prev_message['_id'] == message['_id']:
                 # Don't bother with re-applying the same scene:
                 return False
             else:
@@ -195,6 +214,7 @@ def paint_with_colors(strip, colors):
             red, green, blue = rgb_tuples[rgb_tuple_index]
             rgb_tuple_index += 1
         # No idea why, but this function accepts in format GRB..
+
         strip.setPixelColor(i, Color(green, red, blue))
         strip.show()
 
@@ -268,13 +288,33 @@ def twinkle(strip, colors, pct_lit=.3):
             pixel_list.pop(on_index)
 
 
+def calculate_intermediates(colors, seconds=5):
+    intermediate_colors = []
+    for i, color in enumerate(colors):
+        # Calculate the difference in green, red, and blue:
+        diffG = abs(color[0] - colors[i + 1][0])
+        diffR = abs(color[1] - colors[i + 1][1])
+        diffB = abs(color[2] - colors[i + 1][2])
+        # Each "step" will be .5 seconds long; make a Color for each step and put in the array:
+        numSteps = seconds * 2
+        for step in range(numSteps):
+            # // -> Integer division to get floor; * step to get progress toward next color:
+            newG = color[0] + ((diffG // numSteps) * step)
+            newR = color[1] + ((diffR // numSteps) * step)
+            newB = color[2] + ((diffB // numSteps) * step)
+            intermediate_colors.append(Color(newG, newR, newB))
 
-def fade_between(strip, colors, wait_ms=10):
-    for i, color in colors:
-        diffR = abs(hex(color)[0] - hex(colors[i+1])[0])
-        # Repeat for green + blue..
-        return diffR
 
+def fade_between(strip, colors):
+    # Figure a percent to change between colors, then populate an array with
+    #   each intermediate color for the length of the full cycle:
+    speed = 2
+    intermediate_colors = calculate_intermediates(colors)
+    for color in intermediate_colors:
+        for i in strip.numPixels():
+            strip.setPixelColor(i, color)
+        strip.show()
+        time.sleep(1/speed)
 
 
 def run():
@@ -288,33 +328,44 @@ def run():
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
 
-    # consumer = create_kafka_consumer()
     queue = set_up_sqs()
-
     await_msgs = True
-    strip = None
 
     global prev_message
     global scene
     global stop_animation
 
+    stop_animation = False
+
     while await_msgs:
         try:
-            for message_str in queue.receive_messages():
-                message_str = message_str.body
-                message = json.loads(message_str)
+            for sqs_msg in queue.receive_messages():
+                message: Scene = json.loads(sqs_msg.body)
                 print(message)
                 print(message['functionCall'])
+                print(type(message))
 
-                if not handle_ending_animation(strip, message):
-                    break
-
-                if strip is None:
+                try:
+                    strip.setBrightness(int(message['defaultBrightness']))
+                except UnboundLocalError:
+                    if message['functionCall'] == 'off':
+                        strip = make_strip(0)
+                        sqs_msg.delete(ReceiptHandle=sqs_msg.receipt_handle)
+                        continue
+                    # The strip hasn't been initialized yet; go ahead and do so:
                     strip = make_strip(message['defaultBrightness'])
                     strip.begin()
-                else:
-                    strip.setBrightness(int(message['defaultBrightness']))
+                except KeyError:
+                    # This just means that there is no 'defaultBrightness' key in message; it is an 'off' message
+                    #   determined by some incomplete duck typing. Hit up the handle_ending_animation function:
+                    print('\nquacKeyError\n')
+                finally:
+                    if not handle_ending_animation(strip, message):
+                        sqs_msg.delete(ReceiptHandle=sqs_msg.receipt_handle)
+                        break
 
+
+                # Thread the scene so we can join the thread to terminate it on change or turn_off:
                 if message['animated']:
                     scene = threading.Thread(target = animation_handler, args=(strip, message['colors'], message['animation']))
                 else:
@@ -322,12 +373,15 @@ def run():
 
                 scene.start()
                 prev_message = message
-                
+
+                # Let the queue know the message is processed, we've successfully consumed it.
+                print('type(sqs_msg): {}'.format(type(sqs_msg)))
+                sqs_msg.delete(ReceiptHandle=sqs_msg.receipt_handle)
 
 
         except KeyboardInterrupt:
             if args.clear:
-                colorWipe(strip, Color(0, 0, 0), 10)
+                fastWipe(strip, Color(0, 0, 0))
             sys.exit(0)
         except Exception as e:
             print(e)
@@ -336,7 +390,7 @@ def run():
             traceback.print_exception(*exc_info)
             del exc_info
             if args.clear:
-                colorWipe(strip, Color(0, 0, 0), 10)
+                fastWipe(strip, Color(0, 0, 0))
             sys.exit(0)
 
 
