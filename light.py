@@ -3,8 +3,9 @@
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
 from neopixel import *
-import threading
+import animations
 import argparse
+import threading
 import time
 import sys
 
@@ -24,6 +25,12 @@ LED_BRIGHTNESS = 255     # Set to 0 for darkest and 255 for brightest
 LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
+
+def fastWipe(strip, color):
+    """Wipe color REAL QUICK across display a pixel at a time."""
+    for i in range(strip.numPixels()):
+        strip.setPixelColor(i, color)
+        strip.show()
 
 
 # Define functions which animate LEDs in various ways.
@@ -108,13 +115,8 @@ def create_kafka_consumer():
         'applyScene',
         bootstrap_servers=[config('KAFKA_URL')],
         value_deserializer=lambda x: loads(x.decode('utf-8')),
-        auto_offset_reset='latest',
         api_version=(0,10,1)
     )
-
-
-def turn_off(strip):
-    colorWipe(strip, Color(0,0,0), 10)
 
 
 def make_strip(brightness):
@@ -128,7 +130,8 @@ def animation_handler(strip, colors, animation):
         switcher = {
             "Projectile": fire_projectiles,
             "Breathe": breathe,
-            "Twinkle": twinkle
+            "Twinkle": twinkle,
+            "Fade": fade_between
         }
         switcher[animation](strip, colors)
 
@@ -139,8 +142,8 @@ def handle_ending_animation(strip, message):
     if message['functionCall'] == "off":
         if strip is not None:
             stop_animation = True
-            turn_off(strip)
             scene.join()
+            fastWipe(strip, Color(0,0,0))
             stop_animation = False
             # Returning False tells the main loop to just wait for the next message
             #   instead of handling it further as if it were a scene
@@ -165,13 +168,16 @@ def handle_ending_animation(strip, message):
             return True
 
 
-
 # Scenes:
 def paint_with_colors(strip, colors):
     # Accept color as hex
     print('Setting solid color to: {}'.format(colors))
-    # Extracting ints from RgbColor object, which stores them as strings
-    rgb_tuples = convert_to_rgb(colors)
+
+    if type(colors[0]) == str:
+        # Extracting ints from RgbColor object, which stores them as strings:
+        rgb_tuples = convert_to_rgb(colors)
+    else:
+        rgb_tuples = colors
     print('RGBs: {}'.format(rgb_tuples))
     range_per_color = strip.numPixels() / len(rgb_tuples)
     range_per_color = int(range_per_color)
@@ -182,9 +188,9 @@ def paint_with_colors(strip, colors):
         if i % range_per_color == 0 and rgb_tuple_index < len(rgb_tuples):
             red, green, blue = rgb_tuples[rgb_tuple_index]
             rgb_tuple_index += 1
-        # No idea why, but this function accepts in format GRB..
-        strip.setPixelColor(i, Color(green, red, blue))
-        strip.show()
+            # No idea why, but this function accepts in format GRB..
+            strip.setPixelColor(i, Color(green, red, blue))
+            strip.show()
 
 
 def fire_projectiles(strip, colors, projectile_size=8):
@@ -256,13 +262,56 @@ def twinkle(strip, colors, pct_lit=.3):
             pixel_list.pop(on_index)
 
 
+def bridge_fade(old, new, delta, idx, numSteps, step):
+    """ Because sometimes you just want to make a truly horrific method signature. """
+    # Figure if we're adding or subtracting at the color index (idx -> R, G, or B). New is the 
+    #   transition's target; old is what we're transitioning from. 
+    amountToChange = (delta // numSteps) * step
+    if new[idx] > old[idx]:
+        return old[idx] + amountToChange
+    else:
+        return old[idx] - amountToChange
 
-def fade_between(strip, colors, wait_ms=10):
-    for i, color in colors:
-        diffR = abs(hex(color)[0] - hex(colors[i+1])[0])
-        # Repeat for green + blue..
-        return diffR
 
+def calculate_intermediates(colors, seconds=10):
+    intermediate_colors = []
+    rgb_colors = convert_to_rgb(colors)
+    for i, color in enumerate(rgb_colors):
+        # Wrap around to first item when on last index so it goes full-circle smoothly:
+        next = (i + 1) % (len(rgb_colors))
+        print('next: {}'.format(next))
+        nextColor = rgb_colors[next]
+
+        # Calculate the difference in green, red, and blue:
+        diffR = abs(color[0] - nextColor[0])
+        diffG = abs(color[1] - nextColor[1])
+        diffB = abs(color[2] - nextColor[2])
+
+        # Each "step" will be .5 seconds long; make a Color for each step and put in the array:
+        numSteps = seconds * 2
+        for currentStep in range(numSteps):
+            # '//' -> Integer division to get floor; * currentStep to get progress toward next color per half sec:
+            newR = bridge_fade(color, nextColor, diffR, 0, numSteps, currentStep)
+            newG = bridge_fade(color, nextColor, diffG, 1, numSteps, currentStep)
+            newB = bridge_fade(color, nextColor, diffB, 2, numSteps, currentStep)
+            intermediate_colors.append(Color(newG, newR, newB))
+
+    return intermediate_colors
+
+
+def fade_between(strip, colors):
+    # Figure a percent to change between colors, then populate an array with
+    #   each intermediate color for the length of the full cycle:
+    speed = 15
+    intermediate_colors = calculate_intermediates(colors)
+    print('fade_between')
+
+    while not stop_animation:
+        for color in intermediate_colors:
+            for i in range(strip.numPixels()):
+                strip.setPixelColor(i, color)
+            strip.show()
+            time.sleep(1/speed)
 
 
 def run():
@@ -287,6 +336,7 @@ def run():
 
     while await_msgs:
         try:
+            print('while')
             for message in consumer:
                 message = message.value
                 print(message)
@@ -312,7 +362,7 @@ def run():
 
         except KeyboardInterrupt:
             if args.clear:
-                colorWipe(strip, Color(0, 0, 0), 10)
+                fastWipe(strip, Color(0, 0, 0))
             sys.exit(0)
         except Exception as e:
             print(e)
@@ -321,8 +371,9 @@ def run():
             traceback.print_exception(*exc_info)
             del exc_info
             if args.clear:
-                colorWipe(strip, Color(0, 0, 0), 10)
+                fastWipe(strip, Color(0, 0, 0))
             sys.exit(0)
+
 
 
 if __name__ == "__main__":

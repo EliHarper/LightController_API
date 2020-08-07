@@ -46,7 +46,8 @@ def off():
 def applyScene(scene_id):
     print("Hit function")
     toApply = scenes.find_one({"_id": ObjectId(scene_id)})
-    producer.send('applyScene', toApply)
+    future = producer.send('applyScene', toApply)
+    print (future.__dict__)
     print("applied")
     return "applied"
 
