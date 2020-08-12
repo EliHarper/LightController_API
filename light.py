@@ -148,6 +148,11 @@ def handle_ending_animation(strip, message):
             # Returning False tells the main loop to just wait for the next message
             #   instead of handling it further as if it were a scene
             return False
+    elif message['functionCall'] == 'update_brightness':
+        print("UPDATING BRIGHTNESS TO: {}".format(message['value']))
+        strip.setBrightness(int(message['value']))
+        strip.show()
+        return False
     else:
         try:
             # Check if the changed-to scene is the same as the last - if not, tell the thread to end.
@@ -178,7 +183,7 @@ def paint_with_colors(strip, colors):
         rgb_tuples = convert_to_rgb(colors)
     else:
         rgb_tuples = colors
-    print('RGBs: {}'.format(rgb_tuples))
+
     range_per_color = strip.numPixels() / len(rgb_tuples)
     range_per_color = int(range_per_color)
     rgb_tuple_index = 0
@@ -189,8 +194,8 @@ def paint_with_colors(strip, colors):
             red, green, blue = rgb_tuples[rgb_tuple_index]
             rgb_tuple_index += 1
             # No idea why, but this function accepts in format GRB..
-            strip.setPixelColor(i, Color(green, red, blue))
-            strip.show()
+        strip.setPixelColor(i, Color(green, red, blue))
+        strip.show()
 
 
 def fire_projectiles(strip, colors, projectile_size=8):
