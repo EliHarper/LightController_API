@@ -2,7 +2,7 @@ import json
 
 from bson import json_util, BSON
 from bson.objectid import ObjectId
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from flask import Flask, request, Blueprint
 from kafka import KafkaProducer
 from decouple import config
@@ -33,7 +33,7 @@ producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
 
 @api.route('/scenes', methods=['GET'])
 def home():
-    docs = scenes.find()
+    docs = scenes.find().sort([("index", ASCENDING)])
     return json_util.dumps(docs)
 
 
@@ -100,8 +100,8 @@ def putIndices():
     for scene_id, scene_index in scene_ids_and_indices.items():
         # query = {'_id': ObjectId(scene_id)}
         # setIndex = {"$set": {"index": scene_index}}
-        result = scenes.find_one_and_update(query={'_id': ObjectId(scene_id)}, update={"$set": {"index": int(scene_index)}})
-        print('result of updating scene with id {} to have index {}: \n{}'.format(scene_id, scene_index, result))
+        result = scenes.update_one({'_id': ObjectId(scene_id)}, {"$set": {"index": int(scene_index)}})
+        print('result of updating scene with id {} to have index {}: \n{}'.format(scene_id, scene_index, result.raw_result))
 
     return "done"
 
