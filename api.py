@@ -11,8 +11,9 @@ from application import create_app
 
 
 class Message:
-    def __init__(self, functionCall = 'off'):
+    def __init__(self, functionCall = 'off', value=''):
         self.functionCall = functionCall
+        self.value = value
 
 
 
@@ -46,7 +47,8 @@ def off():
 def applyScene(scene_id):
     print("Hit function")
     toApply = scenes.find_one({"_id": ObjectId(scene_id)})
-    producer.send('applyScene', toApply)
+    future = producer.send('applyScene', toApply)
+    print (future.__dict__)
     print("applied")
     return "applied"
 
@@ -85,6 +87,12 @@ def updateScene():
     query = {'_id': ObjectId(id['$oid'])}
     newVal = {"$set": updated}
     scenes.update_one(query, newVal)
+    return "done"
+
+@api.route('/brightness/<string:brightness>', methods=['GET'])
+def updateBrightness(brightness):
+    msg = Message(functionCall='update_brightness', value=brightness)
+    producer.send('applyScene', msg.__dict__)
     return "done"
 
 
