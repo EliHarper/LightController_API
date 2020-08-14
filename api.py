@@ -72,6 +72,40 @@ def deleteScene(scene_id):
     scenes.delete_one({'_id': ObjectId(scene_id)})
     return "done"
 
+
+@api.route('/indices/edit', methods=['PUT', 'OPTIONS'])
+def putIndices():
+    if request.method == 'OPTIONS':
+        return "ok"
+
+    updatedScenes = request.get_json()
+    scene_ids_and_indices = dict()
+    try:
+        for scene in updatedScenes:
+            oid = scene.pop("_id", None)
+            id = oid.pop("$oid", None)
+            if id is None:
+                raise Exception("No _id value found in object {}".format(scene))
+            else:
+                index = scene.pop("index", None)
+                if index is None:
+                    raise Exception("No index value found in object {}".format(scene))
+                print('scene_id: {}'.format(id))
+                scene_ids_and_indices[id] = index
+                print('index: {}'.format(index))
+    except Exception as e:
+        print('caught exception: {}'.format(e))
+
+    print('past except')
+    for scene_id, scene_index in scene_ids_and_indices.items():
+        # query = {'_id': ObjectId(scene_id)}
+        # setIndex = {"$set": {"index": scene_index}}
+        result = scenes.find_one_and_update(query={'_id': ObjectId(scene_id)}, update={"$set": {"index": int(scene_index)}})
+        print('result of updating scene with id {} to have index {}: \n{}'.format(scene_id, scene_index, result))
+
+    return "done"
+
+
 @api.route('/scene/edit', methods=['PUT', 'OPTIONS'])
 def updateScene():
     if request.method == 'OPTIONS':
