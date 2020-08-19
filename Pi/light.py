@@ -3,6 +3,7 @@
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
 from neopixel import *
+
 import animations
 import argparse
 import threading
@@ -16,6 +17,8 @@ from decouple import config
 from random import seed, randint
 import traceback
 
+
+
 # LED strip configuration:
 LED_COUNT      = 300     # Number of LED pixels.
 LED_PIN        = 18      # GPIO pin connected to the pixels (18 uses PWM!).
@@ -25,12 +28,14 @@ LED_BRIGHTNESS = 255     # Set to 0 for darkest and 255 for brightest
 LED_INVERT     = False   # True to invert the signal (when using NPN transistor level shift)
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
+DARK_PIXEL = Color(0,0,0)
 
-def fastWipe(strip, color):
+def fastWipe(strip, color=DARK_PIXEL):
     """Wipe color REAL QUICK across display a pixel at a time."""
     for i in range(strip.numPixels()):
         strip.setPixelColor(i, color)
-        strip.show()
+
+    strip.show()
 
 
 # Define functions which animate LEDs in various ways.
@@ -124,14 +129,40 @@ def make_strip(brightness):
     return strip
 
 
+def message_handler(message):
+    message = message['json']
+
+    print('msg_handlrs msg: {}'.format(message))
+
+    global scene
+
+    if strip is None:
+        strip = make_strip(message['defaultBrightness'])
+        strip.begin()
+    else:
+        strip.setBrightness(int(message['defaultBrightness']))
+
+    if not handle_ending_animation(strip, message):
+        return
+
+    if message['animated']:
+        scene = threading.Thread(target=animation_handler, args=(strip, message['colors'], message['animation']))
+    else:
+        scene = threading.Thread(target=paint_with_colors, args=(strip, message['colors']))
+
+    scene.start()
+
+
 def animation_handler(strip, colors, animation):
     global stop_animation
+
     while not stop_animation:
         switcher = {
             "Projectile": fire_projectiles,
             "Breathe": breathe,
             "Twinkle": twinkle,
-            "Fade": fade_between
+            "Fade": fade_between,
+            "Meiosis": meiosis
         }
         switcher[animation](strip, colors)
 
@@ -292,8 +323,8 @@ def calculate_intermediates(colors, seconds=10):
         diffG = abs(color[1] - nextColor[1])
         diffB = abs(color[2] - nextColor[2])
 
-        # Each "step" will be .33 seconds long; make a Color for each step and put in the array:
-        numSteps = seconds * 3
+        # Each "step" will be .2 seconds long; make a Color for each step and put in the array:
+        numSteps = seconds * 5
         for currentStep in range(numSteps):
             # '//' -> Integer division to get floor; * currentStep to get progress toward next color per half sec:
             newR = bridge_fade(color, nextColor, diffR, 0, numSteps, currentStep)
@@ -319,6 +350,146 @@ def fade_between(strip, colors):
             time.sleep(1/speed)
 
 
+def recenter_cell(strip, recenter_left, color, drift_factor):
+    centerpoint = strip.numPixels() // 2
+    left_color = color if recenter_left else DARK_PIXEL
+    right_color = DARK_PIXEL if recenter_left else color
+
+    left_pixel = centerpoint if recenter_left else (centerpoint - 7)
+    right_pixel = (centerpoint - 7) if recenter_left else centerpoint
+
+    for _ in range(4):
+        strip.setPixelColor(left_pixel, left_color)
+        strip.setPixelColor(right_pixel, right_color)
+        right_pixel = right_pixel + drift_factor
+        left_pixel = left_pixel + drift_factor
+        strip.show()
+        time.sleep(1)
+
+
+def shift_cells(strip, colors, starting_points, absolute_destination):
+    if len(starting_points) % 2 == 1:
+        drift_factor = 1
+    else:
+        drift_factor = -1
+
+    # First calculate number on side:
+    num_on_side = len(starting_points) // 2
+    if drift_factor == -1:
+        num_on_side = num_on_side - 1
+
+    print('Total points: {}; {} of which are on this side.'.format(len(starting_points), num_on_side))
+
+    centerpoint = strip.numPixels() // 2
+    iteration = len(starting_points)
+    moving_right = absolute_destination > centerpoint
+    red, green, blue = colors[iteration + 1]
+    next_color = Color(green, red, blue)
+    left_color = DARK_PIXEL if moving_right else Color()
+    right_color = Color(colors[iteration + 1]) if moving_right else DARK_PIXEL
+
+    for i in range(centerpoint, absolute_destination):
+        l_change = i + 4 if moving_right else i - 4
+        r_change = i - 4 if moving_right else i + 4
+        strip.setPixelColor(l_change, left_color)
+        strip.setPixelColor(r_change, right_color)
+        strip.show()
+        time.sleep(.75)
+
+
+def drift_to_centerpoint(strip, colors, starting_points, iteration):
+    if len(starting_points) % 2 == 1:
+        drift_factor = 1
+    else:
+        drift_factor = -1
+
+    centerpoint = int(strip.numPixels() // 2)
+    # At this point, the central cell will have r = 15 and will split at 7 and 8:
+    denominator = (iteration // 2) + 1
+    relative_destination = (centerpoint // denominator) * drift_factor
+    absolute_destination = centerpoint + relative_destination
+
+    # Write split logic here. Centerpoint goes dark first, then begin shifting to dest:
+    strip.setPixelColor(centerpoint, DARK_PIXEL)
+    strip.show()
+
+    shift_cells(strip, colors, starting_points, absolute_destination, iteration)
+
+    recenter_left = absolute_destination > centerpoint
+
+    red, green, blue = colors[0]
+    center_color = Color(green, red, blue)
+
+    recenter_cell(strip, recenter_left, center_color, drift_factor)
+
+
+def exec_growth_phase(strip, colors, starting_points, phase):
+    # Call and set the 2 lights outside of the current cells
+    #   each time, then show once all pixels have been set:
+    print('starting_points: {}'.format(starting_points))
+    for point_idx, point in enumerate(starting_points):
+        # Gonna want to set the pixels that are at point +
+        upper_pixel = point + phase
+        lower_pixel = point - phase
+
+        print('point_idx: {}'.format(point_idx))
+        print('Color at point_idx {}: {}'.format(point_idx, colors[point_idx]))
+        red, green, blue = colors[point_idx]
+        current_color = Color(green, red, blue)
+
+        strip.setPixelColor(upper_pixel, current_color)
+        strip.setPixelColor(lower_pixel, current_color)
+    strip.show()
+
+
+def grow_cell(strip, colors, starting_points):
+    telephase_radius = 15 # Only for the first; each len(starting_points) tr -= 2
+    # Revise; this will send a negative number for the first phase
+    for phase in range(1,telephase_radius,2):
+        exec_growth_phase(strip, colors, starting_points, phase)
+        time.sleep(1)
+
+
+def get_starting_points(strip, colors, num_children):
+    # starting_points -> centerpoints of each eventual color.
+    #   min: 3; max: 296.    Get these by rounding ideal fractional positions.
+    starting_points = []
+    # Could make this using numpy's arange.. probably inefficient
+    #   BOOKMARK! Figure out how to calculate evenly distributed cells for the current step
+    pixels_on_side = strip.numPixels() // 2
+    children_on_side = num_children // 2 # Fucked for 1..?
+
+    for i in range(num_children):
+        point = (strip.numPixels() // len(colors)) * i
+        starting_points.append(point)
+    return starting_points
+
+
+def meiosis(strip, colors):
+    # Make 1 large ball of a color, then split it as it grows, changing color each time
+    centerpoint = strip.numPixels() // 2
+
+    if type(colors[0]) == str:
+        # Extracting ints from RgbColor object, which stores them as strings:
+        rgb_tuples = convert_to_rgb(colors)
+    else:
+        rgb_tuples = colors
+
+    print('Converted rgb_tuples: {}, Centerpoint: {}'.format(rgb_tuples, centerpoint))
+    red, green, blue = rgb_tuples[0]
+    starting_points = get_starting_points(strip, colors)
+
+    while not stop_animation:
+        strip.setPixelColor(centerpoint, Color(green, red, blue))
+
+        for iteration in range(len(colors)):
+            grow_cell(strip, rgb_tuples, starting_points)
+            drift_to_centerpoint(strip, colors, starting_points)
+
+        fastWipe(strip)
+
+
+
 def run():
     # Process arguments
     parser = argparse.ArgumentParser()
@@ -330,54 +501,54 @@ def run():
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
 
-    consumer = create_kafka_consumer()
+    # consumer = create_kafka_consumer()
 
     await_msgs = True
     strip = None
 
-    global prev_message
     global scene
     global stop_animation
 
-    while await_msgs:
-        try:
-            print('while')
-            for message in consumer:
-                message = message.value
-                print(message)
-                print(message['functionCall'])
-
-                if not handle_ending_animation(strip, message):
-                    break
-
-                if strip is None:
-                    strip = make_strip(message['defaultBrightness'])
-                    strip.begin()
-                else:
-                    strip.setBrightness(int(message['defaultBrightness']))
-
-                if message['animated']:
-                    scene = threading.Thread(target = animation_handler, args=(strip, message['colors'], message['animation']))
-                else:
-                    scene = threading.Thread(target = paint_with_colors, args=(strip, message['colors']))
-
-                scene.start()
-                prev_message = message
-
-
-        except KeyboardInterrupt:
-            if args.clear:
-                fastWipe(strip, Color(0, 0, 0))
-            sys.exit(0)
-        except Exception as e:
-            print(e)
-            exc_info = sys.exc_info()
-            # Display the *original* exception
-            traceback.print_exception(*exc_info)
-            del exc_info
-            if args.clear:
-                fastWipe(strip, Color(0, 0, 0))
-            sys.exit(0)
+    # while await_msgs:
+    #     try:
+    #         print('while')
+    #         for message in consumer:
+    #             message = message.value
+    #             print(message)
+    #             print(message['functionCall'])
+    #
+    #             if not handle_ending_animation(strip, message):
+    #                 break
+    #
+    #             if strip is None:
+    #                 strip = make_strip(message['defaultBrightness'])
+    #                 strip.begin()
+    #             else:
+    #                 strip.setBrightness(int(message['defaultBrightness']))
+    #
+    #             if message['animated']:
+    #                 scene = threading.Thread(target = animation_handler, args=(strip, message['colors'], message['animation']))
+    #             else:
+    #                 scene = threading.Thread(target = paint_with_colors, args=(strip, message['colors']))
+    #
+    #             scene.start()
+    #             prev_message = message
+    try:
+        import Pi.executor_server as server
+        server.serve()
+    except KeyboardInterrupt:
+        if args.clear:
+            fastWipe(strip, Color(0, 0, 0))
+        sys.exit(0)
+    except Exception as e:
+        print(e)
+        exc_info = sys.exc_info()
+        # Display the *original* exception
+        traceback.print_exception(*exc_info)
+        del exc_info
+        if args.clear:
+            fastWipe(strip, Color(0, 0, 0))
+        sys.exit(0)
 
 
 

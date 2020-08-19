@@ -1,10 +1,9 @@
-import json
 
 from bson import json_util, BSON
 from bson.objectid import ObjectId
 from pymongo import MongoClient, ASCENDING
-from flask import Flask, request, Blueprint
-from kafka import KafkaProducer
+from flask import request, Blueprint
+from executor_client import send_grpc
 from decouple import config
 
 from application import create_app
@@ -26,9 +25,9 @@ mongoClient.server_info()
 db = mongoClient.lightdb
 scenes = db.scenes
 
-producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
-                         value_serializer=lambda x:
-                         json_util.dumps(x).encode('utf-8'))
+# producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
+#                          value_serializer=lambda x:
+#                          json_util.dumps(x).encode('utf-8'))
 
 
 @api.route('/scenes', methods=['GET'])
@@ -40,15 +39,15 @@ def home():
 @api.route('/off', methods=['GET'])
 def off():
     msg = Message()
-    producer.send('applyScene', msg.__dict__)
+    send_grpc(msg.__dict__)
     return 'Turned off.'
 
 @api.route('/scene/<string:scene_id>', methods=['GET'])
 def applyScene(scene_id):
     print("Hit function")
     toApply = scenes.find_one({"_id": ObjectId(scene_id)})
-    future = producer.send('applyScene', toApply)
-    print (future.__dict__)
+    future = send_grpc(toApply)
+    print (future)
     print("applied")
     return "applied"
 
@@ -126,7 +125,8 @@ def updateScene():
 @api.route('/brightness/<string:brightness>', methods=['GET'])
 def updateBrightness(brightness):
     msg = Message(functionCall='update_brightness', value=brightness)
-    producer.send('applyScene', msg.__dict__)
+    response = send_grpc(msg.__dict__)
+    print('Response to updated brightness: {}'.format(response))
     return "done"
 
 
