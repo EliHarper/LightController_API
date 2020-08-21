@@ -499,7 +499,8 @@ def get_starting_points(colors, num_children):
     # Could make this using numpy's arange.. probably inefficient
     #   BOOKMARK! Figure out how to calculate evenly distributed cells for the current step
     pixels_on_side = strip.numPixels() // 2
-    children_on_side = num_children // 2 # Fucked for 1..?
+    children_on_side = num_children // 2 if num_children >= 2 else 1
+
 
     for i in range(num_children):
         point = (strip.numPixels() // len(colors)) * i
@@ -520,12 +521,13 @@ def meiosis(colors):
 
     print('Converted rgb_tuples: {}, Centerpoint: {}'.format(rgb_tuples, centerpoint))
     red, green, blue = rgb_tuples[0]
-    starting_points = get_starting_points(colors)
+
 
     while not stop_animation:
         strip.setPixelColor(centerpoint, Color(green, red, blue))
 
-        for iteration in range(len(colors)):
+        for iteration in range(1, len(colors)):
+            starting_points = get_starting_points(colors, iteration)
             grow_cell(rgb_tuples, starting_points)
             drift_to_centerpoint(colors, starting_points)
 
