@@ -19,7 +19,6 @@ class Executor(message_pb2_grpc.ExecutorServicer):
         #   (also move paint_static_colors into animation_handler and get rid of animated bool)
         print('in ApplyChange(); request: {}'.format(request))
         message = MessageToDict(request)
-        print('message: {}\nNow hitting message_handler.'.format(message))
         message_handler(message['json'])
         return message_pb2.ChangeReply(message='success')
 

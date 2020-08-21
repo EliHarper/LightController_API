@@ -121,27 +121,15 @@ class Delta:
 
 
 def convert_to_rgb(colors: list):
-    print('type(colors), from within convert_to_rgb: {}'.format(type(colors)))
-
     tupleys = []
     for hex_color in colors:
         hex_color = hex_color.lstrip('#')
-        print('hex_color, post-strip: {}'.format(hex_color))
         tupleys.append(tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4)))
 
     return tupleys
 
 # Action functions:
 # Administrative:
-def create_kafka_consumer():
-    return KafkaConsumer(
-        'applyScene',
-        bootstrap_servers=[config('KAFKA_URL')],
-        value_deserializer=lambda x: loads(x.decode('utf-8')),
-        api_version=(0,10,1)
-    )
-
-
 def make_strip(brightness):
     global strip
 
@@ -152,32 +140,35 @@ def make_strip(brightness):
 def message_handler(protobuf_message):
     global scene
     global strip
+    global prev_message
 
-    # import pdb; pdb.set_trace()
     message = loads(protobuf_message)
 
-    print('type(message): {}'.format(type(message)))
-    print('msg_handlrs msg: {}'.format(message))
-
     try:
+        # First check if the message requires termination of the previous scene:
+        if handle_ending_animation(message):
+            return
+        # Ensure that the strip has been initialized; if so, apply the new brightness,
+        #   otherwise, create the strip first:
         if strip is not None:
             if message['defaultBrightness']:
                 strip.setBrightness(int(message['defaultBrightness']))
     except (UnboundLocalError, NameError) as e:
+        # These errors will occur when the strip has not been initialized;
+        #   i.e. the first time a scene is applied.
         strip = make_strip(message['defaultBrightness'])
         strip.begin()
 
-    if handle_ending_animation(message):
-        return
-
     colors = message['colors']
-    print('\n\ncolors: {}\n\n'.format(colors))
     if message['animated']:
         scene = threading.Thread(target=animation_handler, args=(colors, message['animation']))
     else:
         scene = threading.Thread(target=paint_with_colors, args=(colors))
 
+    print('pre scene.start()')
     scene.start()
+    print('post scene.start()')
+    prev_message = message
 
 
 def animation_handler(colors, animation):
@@ -205,7 +196,7 @@ def handle_ending_animation(message):
         if strip is not None:
             stop_animation = True
             scene.join()
-            fastWipe(Color(0,0,0))
+            fastWipe()
             stop_animation = False
             # Returning False tells the main loop to just wait for the next message
             #   instead of handling it further as if it were a scene
@@ -218,7 +209,7 @@ def handle_ending_animation(message):
     else:
         try:
             # Check if the changed-to scene is the same as the last - if not, tell the thread to end.
-            if prev_message['_id']['$oid'] == message['_id']['$oid']:
+            if prev_message['_id'] == message['_id']:
                 # Don't bother with re-applying the same scene:
                 return True
             else:
@@ -557,35 +548,10 @@ def run():
     if not args.clear:
         print('Use "-c" argument to clear LEDs on exit')
 
-    # consumer = create_kafka_consumer()
 
     await_msgs = True
     strip = None
 
-    # while await_msgs:
-    #     try:
-    #         print('while')
-    #         for message in consumer:
-    #             message = message.value
-    #             print(message)
-    #             print(message['functionCall'])
-    #
-    #             if not handle_ending_animation(message):
-    #                 break
-    #
-    #             if strip is None:
-    #                 strip = make_strip(message['defaultBrightness'])
-    #                 strip.begin()
-    #             else:
-    #                 strip.setBrightness(int(message['defaultBrightness']))
-    #
-    #             if message['animated']:
-    #                 scene = threading.Thread(target = animation_handler, args=(message['colors'], message['animation']))
-    #             else:
-    #                 scene = threading.Thread(target = paint_with_colors, args=(message['colors']))
-    #
-    #             scene.start()
-    #             prev_message = message
     try:
         import Pi.executor_server as server
         server.serve()
