@@ -20,7 +20,7 @@ class Executor(message_pb2_grpc.ExecutorServicer):
         print('in ApplyChange(); request: {}'.format(request))
         message = MessageToDict(request)
         print('message: {}\nNow hitting message_handler.'.format(message))
-        message_handler(message)
+        message_handler(message['json'])
         return message_pb2.ChangeReply(message='success')
 
 
