@@ -137,12 +137,12 @@ def make_strip(brightness):
     return strip
 
 
-def message_handler(protobuf_message):
+def message_handler(message):
+    # import pdb; pdb.set_trace()
+
     global scene
     global strip
     global prev_message
-
-    message = loads(protobuf_message)
 
     try:
         # First check if the message requires termination of the previous scene:
@@ -160,9 +160,12 @@ def message_handler(protobuf_message):
         strip.begin()
 
     colors = message['colors']
-    if message['animated']:
-        scene = threading.Thread(target=animation_handler, args=(colors, message['animation']))
-    else:
+    try:
+        if message['animated']:
+            scene = threading.Thread(target=animation_handler, args=(colors, message['animation']))
+    except KeyError as ke:
+        # Serialization & deserialization into proto Objects and back will remove
+        print('KeyError: {}'.format(ke))
         scene = threading.Thread(target=paint_with_colors, args=(colors))
 
     print('pre scene.start()')
@@ -188,15 +191,18 @@ def animation_handler(colors, animation):
 
 
 def handle_ending_animation(message):
+    # import pdb; pdb.set_trace()
     global stop_animation
     global strip
 
     # Short-circuit in the event of a "turn off" message:
     if message['functionCall'] == "off":
         if strip is not None:
+            print('hit off fucntionCall')
             stop_animation = True
             scene.join()
             fastWipe()
+            print('past fastWipe')
             stop_animation = False
             # Returning False tells the main loop to just wait for the next message
             #   instead of handling it further as if it were a scene
@@ -209,7 +215,7 @@ def handle_ending_animation(message):
     else:
         try:
             # Check if the changed-to scene is the same as the last - if not, tell the thread to end.
-            if prev_message['_id'] == message['_id']:
+            if prev_message['Id'] == message['Id']:
                 # Don't bother with re-applying the same scene:
                 return True
             else:
@@ -220,8 +226,8 @@ def handle_ending_animation(message):
                     stop_animation = False
 
                 return False
-        # If animation_id is unset (first animation since app start), initialize stop_animation to False:
-        except NameError:
+        # If animationId is unset (first animation since app start), initialize stop_animation to False:
+        except (NameError, KeyError):
             stop_animation = False
             return False
 

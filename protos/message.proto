@@ -9,7 +9,15 @@ service Executor {
 
 // The request message scene or change to be applied.
 message ChangeRequest {
-  string json = 2;
+  string _id = 1;
+  string name = 2;
+  repeated string colors = 3;
+  float defaultBrightness = 4;
+  string functionCall = 5;
+  bool animated = 6;
+  string animation = 7;
+  int32 index = 8;
+  string value = 9;
 }
 
 // The response message containing the result of the action.

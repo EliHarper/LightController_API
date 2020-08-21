@@ -1,10 +1,11 @@
 
-from bson import json_util, BSON
+from bson import json_util
 from bson.objectid import ObjectId
-from pymongo import MongoClient, ASCENDING
-from flask import request, Blueprint
-from executor_client import send_grpc
 from decouple import config
+from executor_client import send_grpc
+from flask import request, Blueprint
+from google import protobuf
+from pymongo import MongoClient, ASCENDING
 
 from application import create_app
 
@@ -25,9 +26,6 @@ mongoClient.server_info()
 db = mongoClient.lightdb
 scenes = db.scenes
 
-# producer = KafkaProducer(bootstrap_servers=[config('KAFKA_URL')],
-#                          value_serializer=lambda x:
-#                          json_util.dumps(x).encode('utf-8'))
 
 
 @api.route('/scenes', methods=['GET'])
@@ -64,7 +62,6 @@ def createScene():
 
 @api.route('/scene/<string:scene_id>', methods=['DELETE', 'OPTIONS'])
 def deleteScene(scene_id):
-    # import pdb; pdb.set_trace()
     if request.method == 'OPTIONS':
         return "ok"
 
@@ -97,8 +94,6 @@ def putIndices():
 
     print('past except')
     for scene_id, scene_index in scene_ids_and_indices.items():
-        # query = {'_id': ObjectId(scene_id)}
-        # setIndex = {"$set": {"index": scene_index}}
         result = scenes.update_one({'_id': ObjectId(scene_id)}, {"$set": {"index": int(scene_index)}})
         print('result of updating scene with id {} to have index {}: \n{}'.format(scene_id, scene_index, result.raw_result))
 

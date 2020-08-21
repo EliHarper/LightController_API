@@ -5,7 +5,7 @@ from concurrent import futures
 import logging
 
 import grpc
-from google.protobuf.json_format import MessageToDict
+from google.protobuf.json_format import MessageToJson, MessageToDict
 
 import message_pb2
 import message_pb2_grpc
@@ -18,8 +18,11 @@ class Executor(message_pb2_grpc.ExecutorServicer):
         # Hit the message_handler function:
         #   (also move paint_static_colors into animation_handler and get rid of animated bool)
         print('in ApplyChange(); request: {}'.format(request))
+        # message = MessageToJson(request)
+        # print('message of JSON: {}'.format(message))
         message = MessageToDict(request)
-        message_handler(message['json'])
+        print('message of type Dict: {}'.format(message))
+        message_handler(message)
         return message_pb2.ChangeReply(message='success')
 
 
