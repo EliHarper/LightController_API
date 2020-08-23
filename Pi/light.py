@@ -138,8 +138,6 @@ def make_strip(brightness):
 
 
 def message_handler(message):
-    # import pdb; pdb.set_trace()
-
     global scene
     global strip
     global prev_message
