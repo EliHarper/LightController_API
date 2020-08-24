@@ -5,5 +5,4 @@ pymongo
 kafka-python
 python-decouple
 grpcio
-grpcio-tools
 google

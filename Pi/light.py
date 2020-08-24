@@ -3,9 +3,11 @@
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
 from neopixel import *
+from .message import SceneMessage, AdministrativeMessage
 
 import animations
 import argparse
+import logging
 import threading
 import time
 import sys
@@ -29,6 +31,13 @@ LED_INVERT     = False   # True to invert the signal (when using NPN transistor 
 LED_CHANNEL    = 0       # set to '1' for GPIOs 13, 19, 41, 45 or 53
 
 DARK_PIXEL = Color(0,0,0)
+
+
+LOGGER_NAME = 'light_logger'
+LOG_LOCATION = 'log/light.log'
+
+UPDATE_BRIGHTNESS = 'update_brightness'
+OFF = 'off'
 
 
 def fastWipe(color=DARK_PIXEL):
@@ -130,6 +139,16 @@ def convert_to_rgb(colors: list):
 
 # Action functions:
 # Administrative:
+def configure_logger(name: str, filepath: str, logLevel: int) -> logging.Logger:
+    logger = logging.getLogger(name)
+    handler = logging.FileHandler(filepath)
+
+    logger.addHandler(handler)
+    logger.setLevel(logLevel)
+
+    return logger
+
+
 def make_strip(brightness):
     global strip
 
@@ -149,33 +168,32 @@ def message_handler(message):
         # Ensure that the strip has been initialized; if so, apply the new brightness,
         #   otherwise, create the strip first:
         if strip is not None:
-            if message['defaultBrightness']:
-                strip.setBrightness(int(message['defaultBrightness']))
+            if type(message) == SceneMessage:
+                strip.setBrightness(int(message.defaultBrightness))
     except (UnboundLocalError, NameError) as e:
         # These errors will occur when the strip has not been initialized;
         #   i.e. the first time a scene is applied.
-        strip = make_strip(message['defaultBrightness'])
+        strip = make_strip(message.defaultBrightness)
         strip.begin()
 
-    colors = message['colors']
+    
     try:
-        if message['animated']:
-            scene = threading.Thread(target=animation_handler, args=(colors, message['animation']))
+        if message.animated:
+            scene = threading.Thread(target=animation_handler, args=(message.colors, message.animation))
     except KeyError as ke:
         # Serialization & deserialization into proto Objects and back will remove
-        print('KeyError: {}'.format(ke))
+        logger.debug('KeyError: {}'.format(ke))
         scene = threading.Thread(target=paint_with_colors, args=(colors))
 
-    print('pre scene.start()')
     scene.start()
-    print('post scene.start()')
+    
     prev_message = message
 
 
 def animation_handler(colors, animation):
     global stop_animation
 
-    print('Received animation {} in animation_handler'.format(animation))
+    logger.info('Received animation {} in animation_handler'.format(animation))
 
     while not stop_animation:
         switcher = {
@@ -194,36 +212,39 @@ def handle_ending_animation(message):
     global strip
 
     # Short-circuit in the event of a "turn off" message:
-    if message['functionCall'] == "off":
+    if message.functionCall == OFF:
         if strip is not None:
-            print('hit off fucntionCall')
+            logger.info('Hit \'off\' fucntionCall')
             stop_animation = True
             scene.join()
             fastWipe()
-            print('past fastWipe')
+            logger.info('Lights wiped; they should now be in their \"off\" state.')
             stop_animation = False
             # Returning False tells the main loop to just wait for the next message
             #   instead of handling it further as if it were a scene
             return True
-    elif message['functionCall'] == 'update_brightness':
-        print("UPDATING BRIGHTNESS TO: {}".format(message['value']))
-        strip.setBrightness(int(message['value']))
+
+    elif message.functionCall == UPDATE_BRIGHTNESS :
+        logger.info("UPDATING BRIGHTNESS TO: {}".format(message.value))
+        strip.setBrightness(int(message.value))
         strip.show()
         return True
+
     else:
         try:
             # Check if the changed-to scene is the same as the last - if not, tell the thread to end.
-            if prev_message['Id'] == message['Id']:
+            if prev_message.Id == message.Id:
                 # Don't bother with re-applying the same scene:
                 return True
+
             else:
-                if prev_message['animated']:
+                if prev_message.animated:
                     # Tell animated function to end, then wait for it to do so before continuing.
                     stop_animation = True
                     scene.join()
                     stop_animation = False
-
                 return False
+
         # If animationId is unset (first animation since app start), initialize stop_animation to False:
         except (NameError, KeyError):
             stop_animation = False
@@ -235,7 +256,7 @@ def paint_with_colors(*colors):
     global strip
 
     # Accept color as hex
-    print('Setting solid color to: {}'.format(colors))
+    logger.info('Setting solid color to: {}'.format(colors))
 
     if type(colors[0]) == str:
         # Extracting ints from RgbColor object, which stores them as strings:
@@ -249,7 +270,7 @@ def paint_with_colors(*colors):
     range_per_color = int(range_per_color)
     rgb_tuple_index = 0
 
-    print('rgb_tuples: {}, len(rgb_tuples): {}, type(rgb_tuples[0]): {}'.format(rgb_tuples, len(rgb_tuples), type(rgb_tuples[0])))
+    logger.info('rgb_tuples: {}, len(rgb_tuples): {}, type(rgb_tuples[0]): {}'.format(rgb_tuples, len(rgb_tuples), type(rgb_tuples[0])))
 
     for i in range(strip.numPixels()):
         # Make the strip show even(ish) amounts of each color, with remainder applied to last color
@@ -351,7 +372,6 @@ def calculate_intermediates(colors, seconds=10):
     for i, color in enumerate(rgb_colors):
         # Wrap around to first item when on last index so it goes full-circle smoothly:
         next = (i + 1) % (len(rgb_colors))
-        print('next: {}'.format(next))
         nextColor = rgb_colors[next]
 
         # Calculate the difference in green, red, and blue:
@@ -378,7 +398,6 @@ def fade_between(colors):
     #   each intermediate color for the length of the full cycle:
     speed = 15
     intermediate_colors = calculate_intermediates(colors)
-    print('fade_between')
 
     while not stop_animation:
         for color in intermediate_colors:
@@ -420,7 +439,7 @@ def shift_cells(colors, starting_points, absolute_destination):
     if drift_factor == -1:
         num_on_side = num_on_side - 1
 
-    print('Total points: {}; {} of which are on this side.'.format(len(starting_points), num_on_side))
+    logger.info('Total points: {}; {} of which are on this side.'.format(len(starting_points), num_on_side))
 
     centerpoint = strip.numPixels() // 2
     iteration = len(starting_points)
@@ -472,14 +491,14 @@ def exec_growth_phase(colors, starting_points, phase):
 
     # Call and set the 2 lights outside of the current cells
     #   each time, then show once all pixels have been set:
-    print('starting_points: {}'.format(starting_points))
+    logger.info('starting_points: {}'.format(starting_points))
     for point_idx, point in enumerate(starting_points):
         # Gonna want to set the pixels that are at point +
         upper_pixel = point + phase
         lower_pixel = point - phase
 
-        print('point_idx: {}'.format(point_idx))
-        print('Color at point_idx {}: {}'.format(point_idx, colors[point_idx]))
+        logger.info('point_idx: {}'.format(point_idx))
+        logger.info('Color at point_idx {}: {}'.format(point_idx, colors[point_idx]))
         red, green, blue = colors[point_idx]
         current_color = Color(green, red, blue)
 
@@ -523,7 +542,7 @@ def meiosis(colors):
     else:
         rgb_tuples = colors
 
-    print('Converted rgb_tuples: {}, Centerpoint: {}'.format(rgb_tuples, centerpoint))
+    logger.info('Converted rgb_tuples: {}, Centerpoint: {}'.format(rgb_tuples, centerpoint))
     red, green, blue = rgb_tuples[0]
 
 
@@ -540,6 +559,7 @@ def meiosis(colors):
 
 
 def run():
+    global logger
     global strip
     global scene
     global stop_animation
@@ -550,10 +570,11 @@ def run():
 
     args = parser.parse_args()
 
-    print('Press Ctrl-C to quit.')
+    logger.debug('Press Ctrl-C to quit.')
     if not args.clear:
-        print('Use "-c" argument to clear LEDs on exit')
+        logger.debug('Use "-c" argument to clear LEDs on exit')
 
+    logger = configure_logger(LOGGER_NAME, LOG_LOCATION, logging.DEBUG)
 
     await_msgs = True
     strip = None
@@ -566,7 +587,7 @@ def run():
             fastWipe(Color(0, 0, 0))
         sys.exit(0)
     except Exception as e:
-        print(e)
+        logger.debug(e)
         exc_info = sys.exc_info()
         # Display the *original* exception
         traceback.print_exception(*exc_info)

@@ -2,12 +2,12 @@
 from bson import json_util
 from bson.objectid import ObjectId
 from decouple import config
-from executor_client import send_grpc
 from flask import request, Blueprint
 from google import protobuf
 from pymongo import MongoClient, ASCENDING
 
 from application import create_app
+from executor_client import send_grpc
 
 
 class Message:
