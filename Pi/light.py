@@ -250,8 +250,9 @@ def handle_ending_animation(message):
             stop_animation = False
             return False
 
-
-# Scenes:
+############
+# Scenes: #
+############
 def paint_with_colors(*colors):
     global strip
 
@@ -554,7 +555,7 @@ def meiosis(colors):
             grow_cell(rgb_tuples, starting_points)
             drift_to_centerpoint(colors, starting_points)
 
-        fastWipe(strip)
+        fastWipe()
 
 
 
@@ -564,36 +565,40 @@ def run():
     global scene
     global stop_animation
 
-    # Process arguments
+    # Process arguments:
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clear', action='store_true', help='clear the display on exit')
-
     args = parser.parse_args()
 
+    # Create the logger:
+    logger = configure_logger(LOGGER_NAME, LOG_LOCATION, logging.DEBUG)
     logger.debug('Press Ctrl-C to quit.')
     if not args.clear:
         logger.debug('Use "-c" argument to clear LEDs on exit')
 
-    logger = configure_logger(LOGGER_NAME, LOG_LOCATION, logging.DEBUG)
 
     await_msgs = True
     strip = None
 
     try:
+        # Serve up the gRPC server & wait for messages to arrive:
         import Pi.executor_server as server
         server.serve()
     except KeyboardInterrupt:
         if args.clear:
-            fastWipe(Color(0, 0, 0))
+            fastWipe()
         sys.exit(0)
     except Exception as e:
+        # Log the exception as it is on arrival:
         logger.debug(e)
         exc_info = sys.exc_info()
-        # Display the *original* exception
+
+        # Display the *original* exception in the console:
         traceback.print_exception(*exc_info)
         del exc_info
+        # "Turn off" the strip if the -c argument was provided before exiting:
         if args.clear:
-            fastWipe(Color(0, 0, 0))
+            fastWipe()
         sys.exit(0)
 
 

@@ -2,7 +2,6 @@ bson
 flask
 flask_cors
 pymongo
-kafka-python
 python-decouple
 grpcio
 google
