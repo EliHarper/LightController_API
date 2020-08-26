@@ -3,7 +3,7 @@
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
 from neopixel import *
-from .message import SceneMessage, AdministrativeMessage
+from message import SceneMessage, AdministrativeMessage
 
 import animations
 import argparse
@@ -35,9 +35,12 @@ DARK_PIXEL = Color(0,0,0)
 
 LOGGER_NAME = 'light_logger'
 LOG_LOCATION = 'log/light.log'
+LOG_LEVEL = logging.DEBUG
+logger = logging.getLogger(LOGGER_NAME)
 
 UPDATE_BRIGHTNESS = 'update_brightness'
 OFF = 'off'
+
 
 
 def fastWipe(color=DARK_PIXEL):
@@ -160,6 +163,7 @@ def message_handler(message):
     global scene
     global strip
     global prev_message
+    global logger
 
     try:
         # First check if the message requires termination of the previous scene:
@@ -176,14 +180,12 @@ def message_handler(message):
         strip = make_strip(message.defaultBrightness)
         strip.begin()
 
-    
     try:
         if message.animated:
             scene = threading.Thread(target=animation_handler, args=(message.colors, message.animation))
-    except KeyError as ke:
+    except (KeyError, AttributeError) as e:
         # Serialization & deserialization into proto Objects and back will remove
-        logger.debug('KeyError: {}'.format(ke))
-        scene = threading.Thread(target=paint_with_colors, args=(colors))
+        scene = threading.Thread(target=paint_with_colors, args=(message.colors))
 
     scene.start()
     
@@ -192,7 +194,9 @@ def message_handler(message):
 
 def animation_handler(colors, animation):
     global stop_animation
+    global logger
 
+    logger = logging.getLogger(LOGGER_NAME)
     logger.info('Received animation {} in animation_handler'.format(animation))
 
     while not stop_animation:
@@ -209,7 +213,7 @@ def animation_handler(colors, animation):
 def handle_ending_animation(message):
     # import pdb; pdb.set_trace()
     global stop_animation
-    global strip
+    global logger
 
     # Short-circuit in the event of a "turn off" message:
     if message.functionCall == OFF:
@@ -234,6 +238,7 @@ def handle_ending_animation(message):
         try:
             # Check if the changed-to scene is the same as the last - if not, tell the thread to end.
             if prev_message.Id == message.Id:
+                logger.info('prev_message.Id is the same. {} == {}'.format(prev_message.Id, message.Id))
                 # Don't bother with re-applying the same scene:
                 return True
 
@@ -246,9 +251,11 @@ def handle_ending_animation(message):
                 return False
 
         # If animationId is unset (first animation since app start), initialize stop_animation to False:
-        except (NameError, KeyError):
+        except (NameError, KeyError, AttributeError):
             stop_animation = False
             return False
+
+    return False
 
 ############
 # Scenes: #
@@ -571,8 +578,8 @@ def run():
     args = parser.parse_args()
 
     # Create the logger:
-    logger = configure_logger(LOGGER_NAME, LOG_LOCATION, logging.DEBUG)
-    logger.debug('Press Ctrl-C to quit.')
+    logger = configure_logger(LOGGER_NAME, LOG_LOCATION, LOG_LEVEL)
+    logger.log(logging.DEBUG,'Press Ctrl-C to quit.')
     if not args.clear:
         logger.debug('Use "-c" argument to clear LEDs on exit')
 
