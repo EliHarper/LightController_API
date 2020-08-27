@@ -5,10 +5,12 @@ from __future__ import print_function
 from bson import ObjectId
 import json
 import logging
+import time
 
 import grpc
 from google.protobuf import json_format
 
+import ambilight
 import message_pb2
 import message_pb2_grpc
 
@@ -17,6 +19,8 @@ CHANNEL_ADDRESS = '192.168.1.118:50051'
 
 LOGGER_NAME =  'client_logger'
 LOG_LOCATION = 'log/gRPC_Client.log'
+
+RUN_AMBILIGHT = False
 
 class JSONEncoder(json.JSONEncoder):
     """ Converts BSON from the DB to functional JSON. 
@@ -37,6 +41,20 @@ def configure_logger(name: str, filepath: str, logLevel: int) -> logging.Logger:
     return logger
 
 
+def generate_colors():
+    while RUN_AMBILIGHT:
+        time.sleep(.5)
+        top_colors = ambilight.run()
+        yield top_colors
+
+
+
+def forward_colors(stub):
+    RUN_AMBILIGHT = True
+    color_iterator = generate_colors()
+    future = stub.ApplyAmbiLight(color_iterator)    
+
+
 def send_grpc(msg):
     # NOTE: .close() is possible on a channel and should be
     #   used in circumstances in which the 'with' statement does not fit the needs
@@ -51,6 +69,13 @@ def send_grpc(msg):
         logger.debug('response received by client after sending msg {} in send_grpc: {}'.format(msg, response))
 
     return response
+
+
+def send_stream():
+    """ Applies ambient light via request-streaming gRPC """
+    with grpc.insecure_channel(CHANNEL_ADDRESS) as channel:
+        stub = message_pb2_grpc.ExecutorStub(channel)
+        forward_colors(stub)
 
 
 # if __name__ == '__main__':

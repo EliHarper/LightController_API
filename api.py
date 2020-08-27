@@ -7,7 +7,7 @@ from google import protobuf
 from pymongo import MongoClient, ASCENDING
 
 from application import create_app
-from executor_client import send_grpc
+import executor_client
 
 
 class Message:
@@ -37,17 +37,32 @@ def home():
 @api.route('/off', methods=['GET'])
 def off():
     msg = Message()
-    send_grpc(msg.__dict__)
+    executor_client.send_grpc(msg.__dict__)
     return 'Turned off.'
 
 @api.route('/scene/<string:scene_id>', methods=['GET'])
 def applyScene(scene_id):
     print("Hit function")
     toApply = scenes.find_one({"_id": ObjectId(scene_id)})
-    future = send_grpc(toApply)
+    future = executor_client.send_grpc(toApply)
     print (future)
     print("applied")
     return "applied"
+
+
+@api.route('/ambilight/on', methods=['GET'])
+def applyAmbiLight():
+    print('applying ambilight')
+    future = executor_client.send_stream()
+    print(future)
+    print('applied.')
+    return 'applied'
+
+
+@api.route('/ambilight/off', methods=['GET'])
+def removeAmbiLight():
+    executor_client.RUN_AMBILIGHT = False
+    return 'Turned off.'
 
 
 @api.route('/scene/create', methods=['POST', 'OPTIONS'])

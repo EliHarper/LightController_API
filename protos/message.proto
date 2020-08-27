@@ -5,6 +5,8 @@ syntax = "proto3";
 service Executor {
   // Sends a request to apply a change to the Raspberry Pi and a response to the Flask API.
   rpc ApplyChange (ChangeRequest) returns (ChangeReply) {}
+
+  rpc ApplyAmbiLight (stream ColorsRequest) returns (ChangeReply) {}
 }
 
 // The request message scene or change to be applied.
@@ -18,6 +20,11 @@ message ChangeRequest {
   string animation = 7;
   int32 index = 8;
   string value = 9;
+}
+
+// Ambilight color requests to be streamed to the Pi:
+message ColorsRequest {
+  repeated int32 colors = 1;
 }
 
 // The response message containing the result of the action.

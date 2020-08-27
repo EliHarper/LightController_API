@@ -20,6 +20,11 @@ class ExecutorStub(object):
                 request_serializer=message__pb2.ChangeRequest.SerializeToString,
                 response_deserializer=message__pb2.ChangeReply.FromString,
                 )
+        self.ApplyAmbiLight = channel.stream_unary(
+                '/Executor/ApplyAmbiLight',
+                request_serializer=message__pb2.ColorsRequest.SerializeToString,
+                response_deserializer=message__pb2.ChangeReply.FromString,
+                )
 
 
 class ExecutorServicer(object):
@@ -33,12 +38,23 @@ class ExecutorServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ApplyAmbiLight(self, request_iterator, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ExecutorServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'ApplyChange': grpc.unary_unary_rpc_method_handler(
                     servicer.ApplyChange,
                     request_deserializer=message__pb2.ChangeRequest.FromString,
+                    response_serializer=message__pb2.ChangeReply.SerializeToString,
+            ),
+            'ApplyAmbiLight': grpc.stream_unary_rpc_method_handler(
+                    servicer.ApplyAmbiLight,
+                    request_deserializer=message__pb2.ColorsRequest.FromString,
                     response_serializer=message__pb2.ChangeReply.SerializeToString,
             ),
     }
@@ -65,6 +81,23 @@ class Executor(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Executor/ApplyChange',
             message__pb2.ChangeRequest.SerializeToString,
+            message__pb2.ChangeReply.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ApplyAmbiLight(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_unary(request_iterator, target, '/Executor/ApplyAmbiLight',
+            message__pb2.ColorsRequest.SerializeToString,
             message__pb2.ChangeReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
