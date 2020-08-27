@@ -15,7 +15,7 @@ RUN mkdir /app/log
 WORKDIR /app/
 
 # Add the program files and their supporting env info:
-COPY ["./*", "/app/"]
+COPY ["./*.py", "requirements.txt", "/app/"]
 COPY ["./env/", "/app/env/"]
 
 RUN ls -la /app
