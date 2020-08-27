@@ -290,6 +290,38 @@ def paint_with_colors(*colors):
         strip.show()
 
 
+def apply_static_colors(*colors):
+    """  Paint with colors, but quickly, not one at a time. """
+    global strip
+
+    try:
+        if strip is not None:
+            logger.info('Strip exists')
+    except (UnboundLocalError, NameError) as e:
+        # These errors will occur when the strip has not been initialized;
+        #   i.e. the first time a scene is applied.
+        strip = make_strip(256/3)
+        strip.begin()
+
+    # Accept color as hex
+    logger.info('Setting solid color to: {}'.format(colors))
+
+    range_per_color = strip.numPixels() / len(colors)
+    range_per_color = int(range_per_color)
+    rgb_tuple_index = 0
+
+    logger.info('colors: {}, len(colors): {}, type(colors[0]): {}'.format(colors, len(colors), type(colors[0])))
+
+    for i in range(strip.numPixels()):
+        # Make the strip show even(ish) amounts of each color, with remainder applied to last color
+        if i % range_per_color == 0 and rgb_tuple_index < len(colors):
+            red, green, blue = colors[rgb_tuple_index]
+            rgb_tuple_index += 1
+            # No idea why, but this function accepts in format GRB..
+        strip.setPixelColor(i, Color(green, red, blue))
+    strip.show()
+
+
 def fire_projectiles(colors, projectile_size=8):
     global strip
     global stop_animation
