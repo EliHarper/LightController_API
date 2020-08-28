@@ -35,7 +35,7 @@ DARK_PIXEL = Color(0,0,0)
 
 LOGGER_NAME = 'light_logger'
 LOG_LOCATION = 'log/light.log'
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 logger = logging.getLogger(LOGGER_NAME)
 
 UPDATE_BRIGHTNESS = 'update_brightness'
@@ -257,6 +257,17 @@ def handle_ending_animation(message):
 
     return False
 
+
+def handle_ambilight_protos(protos):
+    logger.debug('in handle_ambilight_protos. Protos: {}'.format(protos))
+    color_list = []
+    for tupley in protos:
+        logger.info('tupley: {}'.format(tupley))
+        r, g, b = tupley[:]
+        logger.info('r, g, b: {}, {}, {}'.format(r, g, b))
+        color_list.append(Color(g, r, b))
+    apply_static_colors(color_list)
+
 ############
 # Scenes: #
 ############
@@ -293,6 +304,8 @@ def paint_with_colors(*colors):
 def apply_static_colors(*colors):
     """  Paint with colors, but quickly, not one at a time. """
     global strip
+
+    logger.info
 
     try:
         if strip is not None:

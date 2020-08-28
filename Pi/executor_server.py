@@ -9,7 +9,7 @@ from google.protobuf.json_format import MessageToJson, MessageToDict
 
 import message_pb2
 import message_pb2_grpc
-from .light import message_handler, apply_static_colors
+from .light import message_handler, handle_ambilight_protos
 from .message import SceneMessage, AdministrativeMessage
 
 
@@ -42,8 +42,12 @@ class Executor(message_pb2_grpc.ExecutorServicer):
     def ApplyAmbiLight(self, request_iterator, context):
         logger.info('in ApplyAmbiLight(); request_iterator: {}'.format(request_iterator))
         # May not be necessary to deserialize to a dict; object should be an RGB array on reformat from string
-        for tupley_list in request_iterator:
-            apply_static_colors(tupley_list)
+        try:
+            for tupley_list in request_iterator:
+                logger.info('tupley_list: {}'.format(tupley_list))
+                handle_ambilight_protos(tupley_list)
+        except grpc.__channel__.Rendezvous as err:
+            logger.info('err: {}'.format(err))
 
         return message_pb2.ChangeReply(message='success')
 

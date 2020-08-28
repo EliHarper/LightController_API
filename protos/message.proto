@@ -22,9 +22,13 @@ message ChangeRequest {
   string value = 9;
 }
 
+message tuple_color {
+  repeated int32 item = 1;
+}
+
 // Ambilight color requests to be streamed to the Pi:
 message ColorsRequest {
-  repeated int32 colors = 1;
+  repeated tuple_color color = 1;
 }
 
 // The response message containing the result of the action.

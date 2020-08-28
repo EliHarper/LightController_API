@@ -135,7 +135,7 @@ def updateScene():
 @api.route('/brightness/<string:brightness>', methods=['GET'])
 def updateBrightness(brightness):
     msg = Message(functionCall='update_brightness', value=brightness)
-    response = send_grpc(msg.__dict__)
+    response = executor_client.send_grpc(msg.__dict__)
     print('Response to updated brightness: {}'.format(response))
     return "done"
 

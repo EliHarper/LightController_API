@@ -41,12 +41,10 @@ def get_top_x_colors(colors: list, x: int):
 def run() -> list:
 # if __name__ == '__main__':
 #     while True:
-    start_time = time.time()
     img = get_screenshot()
     img = img.resize(RESIZE_DIMENSIONS, Image.ANTIALIAS)
     color_list = img.getcolors(img.size[0] * img.size[1])
     top_colors = get_top_x_colors(color_list, NUMBER_OF_COLORS)    
-    end_time = time.time()
     return top_colors
 
         
