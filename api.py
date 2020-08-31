@@ -54,8 +54,7 @@ def applyScene(scene_id):
 def applyAmbiLight():
     print('applying ambilight')
     future = executor_client.send_stream()
-    print(future)
-    print('applied.')
+    print('future: \n{}\n\n'.format(future))
     return 'applied'
 
 

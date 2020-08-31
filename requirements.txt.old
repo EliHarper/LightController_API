@@ -1,0 +1,7 @@
+bson
+flask
+flask_cors
+pymongo
+python-decouple
+grpcio
+google
