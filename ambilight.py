@@ -8,6 +8,23 @@ MIN_RANGE = 10
 NUMBER_OF_COLORS = 5
 RESIZE_DIMENSIONS = (150,150)
 
+
+
+class Ambilight:    
+    def __init__(self):
+        self._on = False
+
+    @property
+    def on(self):
+        return self._on
+
+    @on.setter
+    def on(self, new):
+        if type(new) == bool:
+            self._on = new
+
+
+
 def get_screenshot():
     return ImageGrab.grab()
 

@@ -1,5 +1,5 @@
 
-""" Implementation of the GRPC message.Executor client."""
+""" Implementation of the gRPC message.Executor client."""
 
 from __future__ import print_function
 from bson import ObjectId
@@ -19,10 +19,10 @@ CHANNEL_ADDRESS = '192.168.1.118:50051'
 
 LOGGER_NAME =  'client_logger'
 LOG_LOCATION = 'log/gRPC_Client.log'
-
-RUN_AMBILIGHT = False
-
 logger = logging.getLogger(LOGGER_NAME)
+
+ambi = ambilight.Ambilight()
+
 
 class JSONEncoder(json.JSONEncoder):
     """ Converts BSON from the DB to functional JSON. 
@@ -54,7 +54,7 @@ def generate_colors():
     global logger
     logger = configure_logger(LOGGER_NAME, LOG_LOCATION, logging.DEBUG)
 
-    while RUN_AMBILIGHT:
+    while ambi.on:
         top_colors = ambilight.run()
         logger.debug('top_colors = {}'.format(top_colors))
 
@@ -69,12 +69,11 @@ def generate_colors():
         time.sleep(.5)
 
 
-
 def forward_colors(stub):
-    global RUN_AMBILIGHT
+    global ambi
     global logger
 
-    RUN_AMBILIGHT = True
+    ambi.on = True
     color_iterator = generate_colors()
     summary = stub.ApplyAmbiLight(color_iterator)
     logger.debug('summary: {}'.format(summary.message))
