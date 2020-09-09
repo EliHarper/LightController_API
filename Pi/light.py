@@ -35,7 +35,7 @@ DARK_PIXEL = Color(0,0,0)
 
 LOGGER_NAME = 'light_logger'
 LOG_LOCATION = 'log/light.log'
-LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
 logger = logging.getLogger(LOGGER_NAME)
 
 UPDATE_BRIGHTNESS = 'update_brightness'

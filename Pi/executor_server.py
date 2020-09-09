@@ -26,6 +26,7 @@ VALUE = 'value'
 
 class Executor(message_pb2_grpc.ExecutorServicer):
     def ApplyChange(self, request, context):
+        logger = configure_logger()
         # Hit the message_handler function:
         #   (also move paint_static_colors into animation_handler and get rid of animated bool)
         logger.debug('in ApplyChange(); request: {}'.format(request))
@@ -40,6 +41,9 @@ class Executor(message_pb2_grpc.ExecutorServicer):
 
 
     def ApplyAmbiLight(self, request_iterator, context):
+        logger = configure_logger()
+
+        print('in ambilight.......................')
         logger.info('in ApplyAmbiLight(); request_iterator: {}'.format(request_iterator))
         # May not be necessary to deserialize to a dict; object should be an RGB array on reformat from string
         try:

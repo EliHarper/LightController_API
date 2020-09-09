@@ -22,7 +22,7 @@ LOG_LOCATION = 'log/gRPC_Client.log'
 logger = logging.getLogger(LOGGER_NAME)
 
 ambi = ambilight.Ambilight()
-
+AMBI_COUNT = 0
 
 class JSONEncoder(json.JSONEncoder):
     """ Converts BSON from the DB to functional JSON. 
@@ -52,9 +52,12 @@ def convert_to_proto(msg):
 
 def generate_colors():
     global logger
+    global AMBI_COUNT
+
     logger = configure_logger(LOGGER_NAME, LOG_LOCATION, logging.DEBUG)
 
     while ambi.on:
+        logger.debug('generating top colors..')
         top_colors = ambilight.run()
         logger.debug('top_colors = {}'.format(top_colors))
 
@@ -63,10 +66,13 @@ def generate_colors():
             tuple_proto = message_pb2.tuple_color(item=color)
             tuple_protos.append(tuple_proto)
 
-        colors_req = message_pb2.ColorsRequest(colors=tuple_protos)
+        logger.debug('tuple_protos: {}'.format(tuple_protos))
+        logger.debug('About to make the ColorsRequest')
+        colors_req = message_pb2.ColorsRequest(color=tuple_protos)
 
+        logger.debug('About to yield')
         yield colors_req
-        time.sleep(.5)
+        logger.debug('Passed yield')
 
 
 def forward_colors(stub):
@@ -75,8 +81,11 @@ def forward_colors(stub):
 
     ambi.on = True
     color_iterator = generate_colors()
+
+    print('type(color_iterator): {}'.format(type(color_iterator)))
     summary = stub.ApplyAmbiLight(color_iterator)
-    logger.debug('summary: {}'.format(summary.message))
+    print(summary)
+    # logger.debug('summary: {}'.format(summary.result()))
 
 
 
