@@ -61,6 +61,8 @@ def applyAmbiLight():
 @api.route('/ambilight/off', methods=['GET'])
 def removeAmbiLight():
     executor_client.ambi.on = False
+    msg = Message()
+    executor_client.send_grpc(msg.__dict__)
     return 'Turned off.'
 
 
