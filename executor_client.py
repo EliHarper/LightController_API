@@ -68,11 +68,12 @@ def generate_colors():
 
         logger.debug('tuple_protos: {}'.format(tuple_protos))
         logger.debug('About to make the ColorsRequest')
-        colors_req = message_pb2.ColorsRequest(color=tuple_protos)
+        colors_req = message_pb2.ColorsRequest(colors=tuple_protos)
 
         logger.debug('About to yield')
         yield colors_req
         logger.debug('Passed yield')
+        time.sleep(.5)
 
 
 def forward_colors(stub):

@@ -7,7 +7,7 @@ import gc
 MIN_RANGE = 10
 NUMBER_OF_COLORS = 5
 RESIZE_DIMENSIONS = (150,150)
-
+VERTICAL_COLUMNS = 15
 
 
 class Ambilight:    
@@ -56,13 +56,44 @@ def get_top_x_colors(colors: list, x: int):
     return top_colors
 
 
+def get_top_color_of_verticals(verticals):
+    print('in get_top_color_of_verticals')
+    top_colors = []
+
+    for vertical in verticals:
+        colors = vertical.getcolors(vertical.size[0] * vertical.size[1])
+        top_color_and_freq = max(colors, key = itemgetter(0))
+        print('top_color: {}'.format(top_color_and_freq[1]))
+        top_colors.append(top_color_and_freq[1])
+
+    return top_colors
+
+
+def get_verticals(img):
+    imgwidth, imgheight = img.size
+    verticals = []
+
+    for i in range(VERTICAL_COLUMNS):
+        column_lbnd = (imgwidth / VERTICAL_COLUMNS) * i
+        column_rbnd = (imgwidth / VERTICAL_COLUMNS) * (i + 1)
+        bbox = (column_lbnd, 0, column_rbnd, imgheight) # left, upper, right, lower boundaries of img
+        slice = img.crop(bbox)
+        verticals.append(slice)
+
+    return verticals
+
+
 def run() -> list:
-# if __name__ == '__main__':
-#     while True:
     img = get_screenshot()
     img = img.resize(RESIZE_DIMENSIONS, Image.ANTIALIAS)
-    color_list = img.getcolors(img.size[0] * img.size[1])
-    top_colors = get_top_x_colors(color_list, NUMBER_OF_COLORS)
+    verticals = get_verticals(img)
+    print('got verticals: 0\'s height: {}, and width: {}'.format(verticals[0].height, verticals[0].width))
+    top_colors = get_top_color_of_verticals(verticals)
+
+    # Order by frequency; disregarding greyscales:
+    # color_list = img.getcolors(img.size[0] * img.size[1])
+    # top_colors = get_top_x_colors(color_list, NUMBER_OF_COLORS)
+    # print('top_colors: {}'.format(top_colors))
 
     return top_colors
 

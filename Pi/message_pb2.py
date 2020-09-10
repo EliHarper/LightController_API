@@ -19,7 +19,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\rmessage.proto\"\xae\x01\n\rChangeRequest\x12\x0b\n\x03_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0e\n\x06\x63olors\x18\x03 \x03(\t\x12\x19\n\x11\x64\x65\x66\x61ultBrightness\x18\x04 \x01(\x02\x12\x14\n\x0c\x66unctionCall\x18\x05 \x01(\t\x12\x10\n\x08\x61nimated\x18\x06 \x01(\x08\x12\x11\n\tanimation\x18\x07 \x01(\t\x12\r\n\x05index\x18\x08 \x01(\x05\x12\r\n\x05value\x18\t \x01(\t\"\x1b\n\x0btuple_color\x12\x0c\n\x04item\x18\x01 \x03(\x05\",\n\rColorsRequest\x12\x1b\n\x05\x63olor\x18\x01 \x03(\x0b\x32\x0c.tuple_color\"\x1e\n\x0b\x43hangeReply\x12\x0f\n\x07message\x18\x01 \x01(\t2m\n\x08\x45xecutor\x12-\n\x0b\x41pplyChange\x12\x0e.ChangeRequest\x1a\x0c.ChangeReply\"\x00\x12\x32\n\x0e\x41pplyAmbiLight\x12\x0e.ColorsRequest\x1a\x0c.ChangeReply\"\x00(\x01\x62\x06proto3'
+  serialized_pb=b'\n\rmessage.proto\"\xae\x01\n\rChangeRequest\x12\x0b\n\x03_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x0e\n\x06\x63olors\x18\x03 \x03(\t\x12\x19\n\x11\x64\x65\x66\x61ultBrightness\x18\x04 \x01(\x02\x12\x14\n\x0c\x66unctionCall\x18\x05 \x01(\t\x12\x10\n\x08\x61nimated\x18\x06 \x01(\x08\x12\x11\n\tanimation\x18\x07 \x01(\t\x12\r\n\x05index\x18\x08 \x01(\x05\x12\r\n\x05value\x18\t \x01(\t\"\x1b\n\x0btuple_color\x12\x0c\n\x04item\x18\x01 \x03(\x05\"-\n\rColorsRequest\x12\x1c\n\x06\x63olors\x18\x01 \x03(\x0b\x32\x0c.tuple_color\"\x1e\n\x0b\x43hangeReply\x12\x0f\n\x07message\x18\x01 \x01(\t2m\n\x08\x45xecutor\x12-\n\x0b\x41pplyChange\x12\x0e.ChangeRequest\x1a\x0c.ChangeReply\"\x00\x12\x32\n\x0e\x41pplyAmbiLight\x12\x0e.ColorsRequest\x1a\x0c.ChangeReply\"\x00(\x01\x62\x06proto3'
 )
 
 
@@ -154,7 +154,7 @@ _COLORSREQUEST = _descriptor.Descriptor(
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='color', full_name='ColorsRequest.color', index=0,
+      name='colors', full_name='ColorsRequest.colors', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -173,7 +173,7 @@ _COLORSREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=223,
-  serialized_end=267,
+  serialized_end=268,
 )
 
 
@@ -204,11 +204,11 @@ _CHANGEREPLY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=269,
-  serialized_end=299,
+  serialized_start=270,
+  serialized_end=300,
 )
 
-_COLORSREQUEST.fields_by_name['color'].message_type = _TUPLE_COLOR
+_COLORSREQUEST.fields_by_name['colors'].message_type = _TUPLE_COLOR
 DESCRIPTOR.message_types_by_name['ChangeRequest'] = _CHANGEREQUEST
 DESCRIPTOR.message_types_by_name['tuple_color'] = _TUPLE_COLOR
 DESCRIPTOR.message_types_by_name['ColorsRequest'] = _COLORSREQUEST
@@ -252,8 +252,8 @@ _EXECUTOR = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=301,
-  serialized_end=410,
+  serialized_start=302,
+  serialized_end=411,
   methods=[
   _descriptor.MethodDescriptor(
     name='ApplyChange',

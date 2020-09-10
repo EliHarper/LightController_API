@@ -28,7 +28,7 @@ message tuple_color {
 
 // Ambilight color requests to be streamed to the Pi:
 message ColorsRequest {
-  repeated tuple_color color = 1;
+  repeated tuple_color colors = 1;
 }
 
 // The response message containing the result of the action.

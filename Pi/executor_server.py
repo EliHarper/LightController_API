@@ -9,7 +9,7 @@ from google.protobuf.json_format import MessageToJson, MessageToDict
 
 import message_pb2
 import message_pb2_grpc
-from .light import message_handler, handle_ambilight_protos
+from .light import message_handler, handle_ambilight
 from .message import SceneMessage, AdministrativeMessage
 
 
@@ -49,7 +49,9 @@ class Executor(message_pb2_grpc.ExecutorServicer):
         try:
             for tupley_list in request_iterator:
                 logger.info('tupley_list: {}'.format(tupley_list))
-                handle_ambilight_protos(tupley_list)
+                tuple_dict = MessageToDict(tupley_list)
+                msg_obj = SceneMessage(tuple_dict)
+                handle_ambilight(msg_obj)
         except grpc.__channel__.Rendezvous as err:
             logger.info('err: {}'.format(err))
 

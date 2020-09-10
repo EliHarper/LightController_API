@@ -38,6 +38,7 @@ LOG_LOCATION = 'log/light.log'
 LOG_LEVEL = logging.DEBUG
 logger = logging.getLogger(LOGGER_NAME)
 
+ITEM = 'item'
 UPDATE_BRIGHTNESS = 'update_brightness'
 OFF = 'off'
 
@@ -258,14 +259,16 @@ def handle_ending_animation(message):
     return False
 
 
-def handle_ambilight_protos(protos):
-    logger.debug('in handle_ambilight_protos. Protos: {}'.format(protos))
+def handle_ambilight(protos):
+    logger.debug('in handle_ambilight. Values: {}'.format(protos))
     color_list = []
-    for tupley in protos:
+
+    for tupley in protos.colors:
         logger.info('tupley: {}'.format(tupley))
-        r, g, b = tupley[:]
-        logger.info('r, g, b: {}, {}, {}'.format(r, g, b))
-        color_list.append(Color(g, r, b))
+        rgb_tuple = tuple(tupley[ITEM])
+        logger.info('rgb_tuple: {}'.format(rgb_tuple))
+        color_list.append(rgb_tuple)
+
     apply_static_colors(color_list)
 
 ############
@@ -305,8 +308,6 @@ def apply_static_colors(*colors):
     """  Paint with colors, but quickly, not one at a time. """
     global strip
 
-    logger.info
-
     try:
         if strip is not None:
             logger.info('Strip exists')
@@ -315,6 +316,10 @@ def apply_static_colors(*colors):
         #   i.e. the first time a scene is applied.
         strip = make_strip(256/3)
         strip.begin()
+
+    if len(colors) == 1:
+        colors = colors[0]
+        logger.info('Changed value of colors; now it\'s: {}'.format(colors))
 
     # Accept color as hex
     logger.info('Setting solid color to: {}'.format(colors))
