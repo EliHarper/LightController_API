@@ -1,4 +1,5 @@
 import json
+import re
 
 from bson import json_util, BSON
 from bson.objectid import ObjectId
@@ -51,6 +52,16 @@ def applyScene(scene_id):
     print (future.__dict__)
     print("applied")
     return "applied"
+
+
+@api.route('/scene/name/<string:scene_name>', methods=['GET'])
+def applySceneByName(scene_name):
+    splitName = scene_name.replace('_', ' ')
+    toApply = scenes.find_one({"name": re.compile(splitName, re.IGNORECASE)})
+    future = producer.send('applyScene', toApply)
+    print (future.__dict__)
+    print('applied')
+    return 'applied'
 
 
 @api.route('/scene/create', methods=['POST', 'OPTIONS'])
