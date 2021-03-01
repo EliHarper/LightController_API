@@ -1,4 +1,4 @@
-
+import re
 from bson import json_util
 from bson.objectid import ObjectId
 from decouple import config
@@ -48,6 +48,16 @@ def applyScene(scene_id):
     print (future)
     print("applied")
     return "applied"
+
+
+@api.route('/scene/name/<string:scene_name>', methods=['GET'])
+def applySceneByName(scene_name):
+    splitName = scene_name.replace('_', ' ')
+    toApply = scenes.find_one({"name": re.compile(splitName, re.IGNORECASE)})
+    future = executor_client.send_grpc(toApply)
+    print (future.__dict__)
+    print('applied')
+    return 'applied'
 
 
 @api.route('/ambilight/on', methods=['GET'])
