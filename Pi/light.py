@@ -1,21 +1,17 @@
 #!/usr/bin/env python3
 
+import argparse
+import logging
+import sys
+import threading
+import time
+
+from message import SceneMessage
 # Built from direct port of the Arduino NeoPixel library strandtest example.  Showcases
 # various animations on a strip of NeoPixels.
 from neopixel import *
-from message import SceneMessage, AdministrativeMessage
-
-import animations
-import argparse
-import logging
-import threading
-import time
-import sys
 
 sys.path.insert(0, "/home/pi/.local/lib/python3.7/site-packages")
-from kafka import KafkaConsumer
-from json import loads
-from decouple import config
 from random import seed, randint
 import traceback
 
