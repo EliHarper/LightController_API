@@ -15,7 +15,7 @@ import message_pb2
 import message_pb2_grpc
 
 
-CHANNEL_ADDRESS = '192.168.1.118:50051'
+CHANNEL_ADDRESS = '192.168.1.8:50051'
 
 LOGGER_NAME =  'client_logger'
 LOG_LOCATION = 'log/gRPC_Client.log'
