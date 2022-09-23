@@ -16,7 +16,7 @@ MarkupSafe==1.1.1
 Pillow==7.2.0
 pipdeptree==1.0.0
 pipreqs==0.4.10
-protobuf==3.13.0
+protobuf==3.18.3
 pymongo==3.10.1
 python-dateutil==2.8.1
 python-decouple==3.3
